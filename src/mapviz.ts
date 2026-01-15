@@ -27,7 +27,6 @@ export class MapViz {
     constructor(options: MapOptions) {
         this.canvas = options.canvas;
         const context = this.canvas.getContext("2d");
-
         if (!context) {
             throw new Error("Could not get 2D context from canvas element");
         }
@@ -86,11 +85,16 @@ export class MapViz {
     }
 
     private setupInteractions(): void {
+        this.canvas.style.touchAction = "none";
         const selection = d3.select(this.canvas);
 
         // Rotation (Drag)
         selection.call(
             d3.drag<HTMLCanvasElement, unknown>()
+                // FILTER: Only allow drag if it's NOT a two-finger touch (pinch)
+                .filter((event) => {
+                    return !event.touches || event.touches.length < 2;
+                })
                 .on("start", (event) => {
                     const r = this.projection.rotate();
                     // Convert current rotation to a versor (quaternion)
@@ -99,6 +103,10 @@ export class MapViz {
                     this.q0 = versor(r);
                 })
                 .on("drag", (event) => {
+                    // CRITICAL: If a second finger touches mid-drag, stop rotating immediately
+                    if (event.sourceEvent.touches && event.sourceEvent.touches.length > 1) {
+                        return;
+                    }
                     // 2. Calculate the current mouse position in 3D cartesian space
                     const v1 = versor.cartesian(this.projection.rotate(this.r0).invert?.([event.x, event.y]));
 

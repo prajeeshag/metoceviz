@@ -1,3 +1,5 @@
 *.nc
 *.grib
 scripts/*.png
+node_modules
+dist/
