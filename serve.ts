@@ -10,7 +10,7 @@ serve({
         console.log(`Request for ${path}`);
         if (path.startsWith("/js/")) {
             const file = Bun.file(`dist/${path.slice("/js/".length)}`);
-            console.log(`Serving ${file}`);
+            console.log(`Serving ${file.name}`);
             if (await file.exists()) return new Response(file);
             return new Response("Not Found", { status: 404 });
         }

@@ -3,7 +3,12 @@
   "module": "index.ts",
   "type": "module",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-json": "^6.1.0",
+    "@types/bun": "latest",
+    "pino": "^10.2.0",
+    "zarrita": "^0.5.4",
+    "zod": "^4.3.5"
   },
   "peerDependencies": {
     "typescript": "^5"
