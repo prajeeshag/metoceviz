@@ -1,5 +1,5 @@
 import * as topojson from "topojson-client";
-import { Globe, mercator, orthographic } from "./services/globe/globe";
+import { Globe } from "./services/globe/globe";
 import * as d3 from "d3-geo";
 
 interface MapOptions {
@@ -32,9 +32,10 @@ export class MapViz {
 
     this.ctx = context;
 
-    const projection =
-      options.projection === "mercator" ? mercator : orthographic;
-    this.globe = new Globe([this.canvas.width, this.canvas.height], projection);
+    this.globe = new Globe({ proj: options.projection, rot: [-83, 0, 0] }, [
+      this.canvas.width,
+      this.canvas.height,
+    ]);
 
     this.init(options);
   }
@@ -99,13 +100,4 @@ export class MapViz {
     ctx.fillStyle = "red";
     ctx.fill();
   }
-
-  /**
-   * Set rotation manually (e.g., to focus on a pole)
-   * @param coords [longitude, latitude]
-   */
-  // public setView(coords: [number, number]): void {
-  //     this.projection.rotate([-coords[0], -coords[1]]);
-  //     this.render();
-  // }
 }
