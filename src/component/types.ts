@@ -1,26 +1,4 @@
 /**
- * A generic interface for objects that can be
- * validated and serialized to JSON.
- */
-export interface Serializable<T> {
-  update(patch: Partial<T>): void;
-  serialize(): string;
-  isEqual(otherState: Serializable<T>): boolean;
-}
-
-type ValidateStrict<T> = {
-  readonly [K in keyof T]: T[K] extends readonly any[]
-    ? number extends T[K]["length"]
-      ? never
-      : T[K] extends any[]
-        ? never
-        : T[K]
-    : T[K] extends object
-      ? ValidateStrict<T[K]>
-      : T[K];
-};
-
-/**
  * Ensures T only contains:
  * 1. Primitives (string, number, boolean, null, undefined)
  * 2. Immutable Tuples (readonly [any, ...])
@@ -42,12 +20,35 @@ type ValidateComponentProps<T> = {
         : never;
 };
 
+function generateFingerPrint(obj: any): string {
+  return JSON.stringify(obj, (key, value) => {
+    // If the value is another Component, use its deterministic toString/fingerprint
+    if (value instanceof ImmutableComponent) {
+      return JSON.parse(value.getFingerprint());
+    }
+
+    // Sort keys of plain objects (internal props)
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+      return Object.keys(value)
+        .sort()
+        .reduce((sorted: any, k) => {
+          sorted[k] = value[k];
+          return sorted;
+        }, {});
+    }
+    return value;
+  });
+}
+
+type ComputeFn<K, V> = (props: K, signal: AbortSignal) => Promise<V> | V;
+
 export abstract class ImmutableComponent<T extends ValidateComponentProps<T>> {
   public readonly props: T;
-  private _fingerprint: string | null = null;
+  private _fingerprint: string;
 
   constructor(props: T) {
     this.props = this.deepFreeze(props);
+    this._fingerprint = generateFingerPrint(this.props);
   }
 
   /**
@@ -58,10 +59,7 @@ export abstract class ImmutableComponent<T extends ValidateComponentProps<T>> {
     return this.getFingerprint();
   }
 
-  private getFingerprint(): string {
-    if (this._fingerprint === null) {
-      this._fingerprint = this.generateDeterministicJson(this.props);
-    }
+  public getFingerprint(): string {
     return this._fingerprint;
   }
 
@@ -78,30 +76,6 @@ export abstract class ImmutableComponent<T extends ValidateComponentProps<T>> {
     });
   }
 
-  private generateDeterministicJson(obj: any): string {
-    return JSON.stringify(obj, (key, value) => {
-      // If the value is another Component, use its deterministic toString/fingerprint
-      if (value instanceof ImmutableComponent) {
-        return JSON.parse(value.getFingerprint());
-      }
-
-      // Sort keys of plain objects (internal props)
-      if (
-        value !== null &&
-        typeof value === "object" &&
-        !Array.isArray(value)
-      ) {
-        return Object.keys(value)
-          .sort()
-          .reduce((sorted: any, k) => {
-            sorted[k] = value[k];
-            return sorted;
-          }, {});
-      }
-      return value;
-    });
-  }
-
   private deepFreeze(obj: any): any {
     Object.freeze(obj);
     Object.getOwnPropertyNames(obj).forEach((prop) => {
@@ -115,5 +89,49 @@ export abstract class ImmutableComponent<T extends ValidateComponentProps<T>> {
       }
     });
     return obj;
+  }
+}
+
+export class Agent<K, V> {
+  constructor(readonly provider: Provider<K, V>) {}
+
+  get(props: K): Promise<V> | V {
+    return this.provider.get(props, this);
+  }
+}
+
+export class Provider<K, V> {
+  private cache = new Map<string, V>();
+  private controllers = new Map<Agent<K, V>, AbortController>();
+
+  constructor(
+    private compute: ComputeFn<K, V>,
+    private maxCacheSize: number = 1,
+  ) {}
+
+  async get(props: K, agent: Agent<K, V>): Promise<V> {
+    const stableKey = generateFingerPrint(props);
+
+    if (stableKey && this.cache.has(stableKey)) {
+      const value = this.cache.get(stableKey)!;
+      this.cache.delete(stableKey);
+      this.cache.set(stableKey, value);
+      return value;
+    }
+
+    this.controllers.get(agent)?.abort();
+    const controller = new AbortController();
+    this.controllers.set(agent, controller);
+
+    const value = await this.compute(props, controller.signal);
+
+    if (stableKey) {
+      this.cache.set(stableKey, value);
+      if (this.maxCacheSize > 0 && this.cache.size > this.maxCacheSize) {
+        const key = this.cache.keys().next().value;
+        this.cache.delete(key!);
+      }
+    }
+    return value;
   }
 }

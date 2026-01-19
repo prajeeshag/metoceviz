@@ -1,8 +1,10 @@
 import * as topojson from "topojson-client";
-import { Globe } from "./services/globe/globe";
-import { GraticuleLayer } from "./services/layers/graticule_layer";
+import { Globe } from "./component/globe";
+import GraticuleLayer from "./component/graticule-layer";
 import * as d3geo from "d3-geo";
 import { ImmutableComponent } from "./component/types";
+import Land from "./component/land-layer";
+import JsonData from "./component/json-data";
 
 interface MapOptions {
   projection: "mercator" | "orthographic";
@@ -27,7 +29,7 @@ const u2 = new User({ rot: [0, 0, 0], name: "Alice" });
 export class MapViz {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private land: any = null;
+  private land: Land | null = null;
 
   constructor(options: MapOptions) {
     this.canvas = document.createElement("canvas");
@@ -62,7 +64,10 @@ export class MapViz {
     fetch(landUrl)
       .then((r) => r.json())
       .then((world) => {
-        this.land = topojson.feature(world, world.objects.land);
+        this.land = new Land({
+          topoJson: new JsonData({ url: landUrl }, world),
+          globe: globe,
+        });
         this.render(globe);
       });
 
@@ -91,14 +96,15 @@ export class MapViz {
 
     // 2. Draw Land
     if (this.land) {
-      ctx.beginPath();
-      ctx.strokeStyle = "#f7faf8ff";
-      ctx.lineWidth = 1;
-      d3geo.geoPath(globe.projection, ctx)(this.land);
-      ctx.stroke();
+      this.land.draw(ctx);
     }
 
     // 3. Draw Grid/Graticule (Optional but helpful for poles)
-    new GraticuleLayer(globe).draw(ctx);
+    const graticule = new GraticuleLayer({
+      globe: globe,
+      strokeStyle: "rgba(0,0,0,0.9)",
+    });
+    console.log(`${graticule}`);
+    graticule.draw(ctx);
   }
 }
