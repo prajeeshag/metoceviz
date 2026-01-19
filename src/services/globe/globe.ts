@@ -4,12 +4,13 @@ import { drag as d3drag } from "d3-drag";
 import { zoom as d3zoom } from "d3-zoom";
 import versor from "versor";
 import * as z from "zod";
+import { ImmutableComponent } from "../../component/types";
 
 interface DragHandler {
   (
     projection: d3geo.GeoProjection,
     canvas: HTMLCanvasElement,
-    render: () => void,
+    render: (globe: Globe) => void,
   ): void;
 }
 
@@ -24,9 +25,9 @@ interface Projection {
 }
 
 function dragRotation(
-  projection: d3geo.GeoProjection,
+  globe: Globe,
   canvas: HTMLCanvasElement,
-  render: () => void,
+  render: (globe: Globe) => void,
 ): void {
   canvas.style.touchAction = "none";
   const selection = d3select(canvas);
@@ -42,9 +43,9 @@ function dragRotation(
         return !event.touches || event.touches.length < 2;
       })
       .on("start", (event) => {
-        const r = projection.rotate();
+        const r = globe.projection.rotate();
         // Convert current rotation to a versor (quaternion)
-        const coord = projection.invert?.([event.x, event.y]);
+        const coord = globe.projection.invert?.([event.x, event.y]);
         if (!coord) return;
         v0 = versor.cartesian(coord);
         r0 = r;
@@ -56,7 +57,7 @@ function dragRotation(
           return;
         }
         // 2. Calculate the current mouse position in 3D cartesian space
-        const coord = projection.rotate(r0).invert?.([event.x, event.y]);
+        const coord = globe.projection.rotate(r0).invert?.([event.x, event.y]);
         if (!coord) return;
         const v1 = versor.cartesian(coord);
 
@@ -66,13 +67,14 @@ function dragRotation(
         // Update the projection with the new rotation
         const angles = versor.rotation(q1);
         // fix to 2 decimal places
-        projection.rotate([
+        const rot = [
           Math.round(angles[0] * 10) / 10,
           Math.round(angles[1] * 10) / 10,
           Math.round(angles[2] * 10) / 10,
-        ]);
+        ];
+        const globeCopy = globe.copy({ rot });
         canvas.style.cursor = "grabbing";
-        render();
+        render({ projection });
       })
       .on("end", () => {
         canvas.style.cursor = "default";
@@ -83,7 +85,7 @@ function dragRotation(
 function dragTranslation(
   projection: d3geo.GeoProjection,
   canvas: HTMLCanvasElement,
-  render: () => void,
+  render: (globe: Globe) => void,
 ): void {
   canvas.style.touchAction = "none";
   const selection = d3select(canvas);
@@ -121,7 +123,7 @@ function dragTranslation(
         ];
         projection.translate(point);
         canvas.style.cursor = "move";
-        render();
+        render({ projection });
       })
       .on("end", () => {
         canvas.style.cursor = "default";
@@ -203,29 +205,32 @@ const GlobeConfig = z.object({
 
 type GlobeConfig = z.infer<typeof GlobeConfig>;
 
-export class Globe {
-  private baseScale: number;
-  private projection: d3geo.GeoProjection;
-  private scaleExtend: [number, number];
-  private dragHandler: DragHandler;
+export class Globe extends ImmutableComponent<{
+  readonly proj: Projections;
+  readonly viewSize: readonly [number, number];
+  readonly rot?: readonly [number, number, number] | undefined;
+  readonly trans?: readonly [number, number] | undefined;
+  readonly scale?: number | undefined;
+}> {
+  public get projection() {
+    const projConfig = PROJECTIONS[this.props.proj];
+    const d3proj = projConfig.d3proj();
+    d3proj
+      .translate([this.props.viewSize[0] / 2, this.props.viewSize[1] / 2])
+      .clipExtent([[0, 0], [...this.props.viewSize]]);
 
-  constructor(config: GlobeConfig, viewportSize: [number, number]) {
-    config = GlobeConfig.parse(config);
-    const projection = PROJECTIONS[config.proj];
-    this.projection = projection
-      .d3proj()
-      .translate([viewportSize[0] / 2, viewportSize[1] / 2])
-      .clipExtent([[0, 0], viewportSize]);
+    projConfig.baseScaleHandler(d3proj, [...this.props.viewSize]);
 
-    // Set up base scale
-    projection.baseScaleHandler(this.projection, viewportSize);
-    this.dragHandler = projection.dragHandler;
-    this.baseScale = this.projection.scale();
-    this.scaleExtend = [this.setMinScaleExtend(viewportSize), 8];
-
-    if (config.rot) this.projection.rotate(config.rot);
-    if (config.trans) this.projection.translate(config.trans);
-    if (config.scale) this.projection.scale(config.scale);
+    if (this.props.rot) {
+      d3proj.rotate([...this.props.rot]);
+    }
+    if (this.props.trans) {
+      d3proj.translate([...this.props.trans]);
+    }
+    if (this.props.scale) {
+      d3proj.scale(this.props.scale);
+    }
+    return d3proj;
   }
 
   project(coordinates: [number, number]): [number, number] | null {
@@ -256,38 +261,97 @@ export class Globe {
 
     return coords;
   }
-
-  path(ctx: CanvasRenderingContext2D | null = null): d3geo.GeoPath {
-    return d3geo.geoPath(this.projection, ctx);
-  }
-
-  setupInteractions(canvas: HTMLCanvasElement, render: () => void): void {
-    canvas.style.touchAction = "none";
-    this.dragHandler(this.projection, canvas, render);
-    this.zoomHandler(canvas, render);
-  }
-
-  setView(coord: [number, number]) {
-    this.projection.rotate([-coord[0], -coord[1], 0]);
-  }
-
-  private setMinScaleExtend(viewportSize: [number, number]) {
-    const fitScale = this.projection
-      .fitSize(viewportSize, { type: "Sphere" })
-      .scale();
-    const minScaleExtend = Math.min(fitScale / this.baseScale, 1);
-    this.projection.scale(this.baseScale);
-    return minScaleExtend;
-  }
-
-  private zoomHandler(canvas: HTMLCanvasElement, render: () => void) {
-    d3select(canvas).call(
-      d3zoom<HTMLCanvasElement, unknown>()
-        .scaleExtent(this.scaleExtend)
-        .on("zoom", (event) => {
-          this.projection.scale(this.baseScale * event.transform.k);
-          render();
-        }),
-    );
-  }
 }
+
+export class Globe1 extends Globe {
+  someFunc() {}
+}
+
+// export class Globe {
+//   private baseScale: number;
+//   private projection: d3geo.GeoProjection;
+//   private scaleExtend: [number, number];
+//   private dragHandler: DragHandler;
+
+//   constructor(config: GlobeConfig, viewportSize: [number, number]) {
+//     config = GlobeConfig.parse(config);
+//     const projection = PROJECTIONS[config.proj];
+//     this.projection = projection
+//       .d3proj()
+//       .translate([viewportSize[0] / 2, viewportSize[1] / 2])
+//       .clipExtent([[0, 0], viewportSize]);
+
+//     // Set up base scale
+//     projection.baseScaleHandler(this.projection, viewportSize);
+//     this.dragHandler = projection.dragHandler;
+//     this.baseScale = this.projection.scale();
+//     this.scaleExtend = [this.setMinScaleExtend(viewportSize), 8];
+
+//     if (config.rot) this.projection.rotate(config.rot);
+//     if (config.trans) this.projection.translate(config.trans);
+//     if (config.scale) this.projection.scale(config.scale);
+//   }
+
+//   project(coordinates: [number, number]): [number, number] | null {
+//     const visible = d3geo.geoPath(this.projection)({
+//       type: "Point",
+//       coordinates: coordinates,
+//     });
+//     if (!visible) {
+//       return null;
+//     }
+//     const result = this.projection(coordinates);
+//     return result ? [result[0], result[1]] : null;
+//   }
+
+//   invert(point: [number, number]): [number, number] | null {
+//     const coords = this.projection.invert?.(point);
+//     if (!coords) return null;
+
+//     const reprojected = this.projection(coords);
+
+//     if (
+//       !reprojected ||
+//       Math.abs(point[0] - reprojected[0]) > 0.5 ||
+//       Math.abs(point[1] - reprojected[1]) > 0.5
+//     ) {
+//       return null;
+//     }
+
+//     return coords;
+//   }
+
+//   path(ctx: CanvasRenderingContext2D | null = null): d3geo.GeoPath {
+//     return d3geo.geoPath(this.projection, ctx);
+//   }
+
+//   setupInteractions(canvas: HTMLCanvasElement, render: () => void): void {
+//     canvas.style.touchAction = "none";
+//     this.dragHandler(this.projection, canvas, render);
+//     this.zoomHandler(canvas, render);
+//   }
+
+//   setView(coord: [number, number]) {
+//     this.projection.rotate([-coord[0], -coord[1], 0]);
+//   }
+
+//   private setMinScaleExtend(viewportSize: [number, number]) {
+//     const fitScale = this.projection
+//       .fitSize(viewportSize, { type: "Sphere" })
+//       .scale();
+//     const minScaleExtend = Math.min(fitScale / this.baseScale, 1);
+//     this.projection.scale(this.baseScale);
+//     return minScaleExtend;
+//   }
+
+//   private zoomHandler(canvas: HTMLCanvasElement, render: () => void) {
+//     d3select(canvas).call(
+//       d3zoom<HTMLCanvasElement, unknown>()
+//         .scaleExtent(this.scaleExtend)
+//         .on("zoom", (event) => {
+//           this.projection.scale(this.baseScale * event.transform.k);
+//           render();
+//         }),
+//     );
+//   }
+// }
