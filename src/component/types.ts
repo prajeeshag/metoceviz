@@ -8,7 +8,7 @@
 type NonNullable<T> = T extends null | undefined ? never : T;
 
 // This version is even more robust for optional properties
-type ValidateComponentProps<T> = {
+export type ValidComponentProps<T> = {
   readonly [K in keyof T]: NonNullable<T[K]> extends string | number | boolean
     ? T[K]
     : NonNullable<T[K]> extends readonly any[]
@@ -40,9 +40,7 @@ function generateFingerPrint(obj: any): string {
   });
 }
 
-type ComputeFn<K, V> = (props: K, signal: AbortSignal) => Promise<V> | V;
-
-export abstract class ImmutableComponent<T extends ValidateComponentProps<T>> {
+export abstract class ImmutableComponent<T extends ValidComponentProps<T>> {
   public readonly props: T;
   private _fingerprint: string;
 
@@ -95,14 +93,16 @@ export abstract class ImmutableComponent<T extends ValidateComponentProps<T>> {
 export class Agent<K, V> {
   constructor(readonly provider: Provider<K, V>) {}
 
-  get(props: K): Promise<V> | V {
+  get(props: K): Promise<V> {
     return this.provider.get(props, this);
   }
 }
 
+type ComputeFn<K, V> = (props: K, signal: AbortSignal) => Promise<V>;
+
 export class Provider<K, V> {
   private cache = new Map<string, V>();
-  private controllers = new Map<Agent<K, V>, AbortController>();
+  private controllers = new WeakMap<Agent<K, V>, AbortController>();
 
   constructor(
     private compute: ComputeFn<K, V>,
@@ -112,7 +112,7 @@ export class Provider<K, V> {
   async get(props: K, agent: Agent<K, V>): Promise<V> {
     const stableKey = generateFingerPrint(props);
 
-    if (stableKey && this.cache.has(stableKey)) {
+    if (this.cache.has(stableKey)) {
       const value = this.cache.get(stableKey)!;
       this.cache.delete(stableKey);
       this.cache.set(stableKey, value);
@@ -125,9 +125,9 @@ export class Provider<K, V> {
 
     const value = await this.compute(props, controller.signal);
 
-    if (stableKey) {
+    if (this.maxCacheSize > 0) {
       this.cache.set(stableKey, value);
-      if (this.maxCacheSize > 0 && this.cache.size > this.maxCacheSize) {
+      if (this.cache.size > this.maxCacheSize) {
         const key = this.cache.keys().next().value;
         this.cache.delete(key!);
       }

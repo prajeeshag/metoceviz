@@ -22,7 +22,10 @@
 - Provider is called by an Agent.
 - Provider should be able to handle multiple Agents.
 - Only one request per Agent should be processed at a time.
-- If a new request comes in from the same Agent, the previous request should be aborted.
+- When a new request comes in:
+  - If the same request is already in progress, return the same promise.
+  - If the same request in cache, return the cached response.
+  - If a different request is already in progress, abort the previous request and start a new one.
 
 ## Agent
 
