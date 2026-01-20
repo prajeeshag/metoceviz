@@ -16,9 +16,14 @@ async function jsonDataFetch(
   props: JsonDataProp,
   signal: AbortSignal,
 ): Promise<JsonData> {
-  const response = await fetch(props.url, { signal });
-  const data = await response.json();
-  return new JsonData(props, data);
+  try {
+    const response = await fetch(props.url, { signal });
+    const data = await response.json();
+    return new JsonData(props, data);
+  } catch (error) {
+    console.error("Error fetching JSON data:", error);
+    throw error;
+  }
 }
 
 export const jsonDataAgent = new JsonDataAgent(

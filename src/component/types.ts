@@ -48,7 +48,8 @@ export abstract class ImmutableComponent<T extends ValidComponentProps<T>, V> {
   readonly value: V;
 
   constructor(props: T, value: V) {
-    this.props = this.deepFreeze(props);
+    // this.props = this.deepFreeze(props);
+    this.props = props;
     this._fingerprint = generateFingerPrint(this.props);
     this.value = value;
   }
@@ -80,12 +81,19 @@ export abstract class ImmutableComponent<T extends ValidComponentProps<T>, V> {
   }
 
   private deepFreeze(obj: any): any {
+    // If the object is already frozen, we can trust it and stop here.
+    if (Object.isFrozen(obj)) return obj;
+
     Object.freeze(obj);
+
+    // If you want to be extra safe but efficient,
+    // only recurse if the property isn't an ImmutableComponent
     Object.getOwnPropertyNames(obj).forEach((prop) => {
       const val = obj[prop];
       if (
         val !== null &&
-        (typeof val === "object" || typeof val === "function") &&
+        typeof val === "object" &&
+        !(val instanceof ImmutableComponent) && // Skip if it's already one of your immutable classes
         !Object.isFrozen(val)
       ) {
         this.deepFreeze(val);
@@ -107,9 +115,10 @@ type ComputeFn<K, V> = (props: K, signal: AbortSignal) => Promise<V>;
 
 export class Provider<K, V> {
   private cache = new Map<string, V>();
-  private processing = new WeakMap<Agent<K, V>, string>();
+  // Track active computations to collapse duplicate requests
+  private pending = new Map<string, Promise<V>>();
   private controllers = new WeakMap<Agent<K, V>, AbortController>();
-  private logger = logger.child({ component: "Provider" });
+  protected logger = logger.child({ component: this.constructor.name });
 
   constructor(
     private compute: ComputeFn<K, V>,
@@ -119,30 +128,48 @@ export class Provider<K, V> {
   async get(props: K, agent: Agent<K, V>): Promise<V> {
     const stableKey = generateFingerPrint(props);
 
+    // 1. Check LRU Cache
     if (this.cache.has(stableKey)) {
       const value = this.cache.get(stableKey)!;
       this.cache.delete(stableKey);
       this.cache.set(stableKey, value);
-      logger.debug(`Returning cached value for ${stableKey}`);
+      this.logger.debug(`Returning cached value for ${stableKey}`);
       return value;
     }
 
-    logger.debug(`Computing value for ${stableKey}`);
+    // 2. Check for In-Flight Request (Request Collapsing)
+    if (this.pending.has(stableKey)) {
+      this.logger.debug(`Awaiting existing computation for ${stableKey}`);
+      return this.pending.get(stableKey)!;
+    }
+
+    // 3. Setup Abort Logic
     this.controllers.get(agent)?.abort();
     const controller = new AbortController();
     this.controllers.set(agent, controller);
 
-    const value = await this.compute(props, controller.signal);
+    // 4. Start Compute and store the Promise
+    this.logger.debug(`Computing value for ${stableKey}`);
+    const computePromise = (async () => {
+      try {
+        const value = await this.compute(props, controller.signal);
 
-    if (this.maxCacheSize > 0) {
-      logger.debug(`Caching value for ${stableKey}`);
-      this.cache.set(stableKey, value);
-      if (this.cache.size > this.maxCacheSize) {
-        const key = this.cache.keys().next().value;
-        this.cache.delete(key!);
+        if (this.maxCacheSize > 0) {
+          this.cache.set(stableKey, value);
+          if (this.cache.size > this.maxCacheSize) {
+            const firstKey = this.cache.keys().next().value;
+            this.cache.delete(firstKey!);
+          }
+        }
+        return value;
+      } finally {
+        // Always clean up the pending map so future requests can re-compute if needed
+        this.pending.delete(stableKey);
       }
-    }
-    return value;
+    })();
+
+    this.pending.set(stableKey, computePromise);
+    return computePromise;
   }
 
   setCacheSize(size: number) {
