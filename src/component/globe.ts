@@ -206,7 +206,7 @@ const GlobeConfig = z.object({
 
 type GlobeConfig = z.infer<typeof GlobeConfig>;
 
-export class Globe extends ImmutableComponent<GlobeConfig> {
+export class Globe extends ImmutableComponent<GlobeConfig, null> {
   public get projection() {
     const projConfig = PROJECTIONS[this.props.proj];
     const d3proj = projConfig.d3proj();

@@ -1,3 +1,5 @@
+import { logger } from "../logger";
+
 /**
  * Ensures T only contains:
  * 1. Primitives (string, number, boolean, null, undefined)
@@ -15,7 +17,7 @@ export type ValidComponentProps<T> = {
       ? number extends NonNullable<T[K]>["length"]
         ? never
         : T[K]
-      : NonNullable<T[K]> extends ImmutableComponent<any>
+      : NonNullable<T[K]> extends ImmutableComponent<any, any>
         ? T[K]
         : never;
 };
@@ -40,13 +42,15 @@ function generateFingerPrint(obj: any): string {
   });
 }
 
-export abstract class ImmutableComponent<T extends ValidComponentProps<T>> {
+export abstract class ImmutableComponent<T extends ValidComponentProps<T>, V> {
   public readonly props: T;
   private _fingerprint: string;
+  readonly value: V;
 
-  constructor(props: T) {
+  constructor(props: T, value: V) {
     this.props = this.deepFreeze(props);
     this._fingerprint = generateFingerPrint(this.props);
+    this.value = value;
   }
 
   /**
@@ -67,10 +71,11 @@ export abstract class ImmutableComponent<T extends ValidComponentProps<T>> {
     return this.getFingerprint() === other.getFingerprint();
   }
 
-  public copy(changes: Partial<T>): this {
+  public copy(changes: Partial<T>, value: V): this {
     return new (this.constructor as any)({
       ...this.props,
       ...changes,
+      value: value,
     });
   }
 
@@ -102,7 +107,9 @@ type ComputeFn<K, V> = (props: K, signal: AbortSignal) => Promise<V>;
 
 export class Provider<K, V> {
   private cache = new Map<string, V>();
+  private processing = new WeakMap<Agent<K, V>, string>();
   private controllers = new WeakMap<Agent<K, V>, AbortController>();
+  private logger = logger.child({ component: "Provider" });
 
   constructor(
     private compute: ComputeFn<K, V>,
@@ -116,9 +123,11 @@ export class Provider<K, V> {
       const value = this.cache.get(stableKey)!;
       this.cache.delete(stableKey);
       this.cache.set(stableKey, value);
+      logger.debug(`Returning cached value for ${stableKey}`);
       return value;
     }
 
+    logger.debug(`Computing value for ${stableKey}`);
     this.controllers.get(agent)?.abort();
     const controller = new AbortController();
     this.controllers.set(agent, controller);
@@ -126,6 +135,7 @@ export class Provider<K, V> {
     const value = await this.compute(props, controller.signal);
 
     if (this.maxCacheSize > 0) {
+      logger.debug(`Caching value for ${stableKey}`);
       this.cache.set(stableKey, value);
       if (this.cache.size > this.maxCacheSize) {
         const key = this.cache.keys().next().value;
@@ -133,5 +143,9 @@ export class Provider<K, V> {
       }
     }
     return value;
+  }
+
+  setCacheSize(size: number) {
+    this.maxCacheSize = size;
   }
 }
