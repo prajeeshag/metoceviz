@@ -416,7 +416,6 @@ export class Globe extends ImmutableComponent<GlobeConfig, null> {
       .on("zoom", (event) => {
         const { transform } = event;
         const newScale = s0 * transform.k;
-        console.info(transform.k, newScale);
         this.setScale(newScale);
         renderZoom(this);
       })
