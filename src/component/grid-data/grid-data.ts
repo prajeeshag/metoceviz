@@ -1,5 +1,5 @@
 import { ImmutableComponent } from "../types";
-import { GeoGridScalar } from "../../datatype/grid";
+import { GridScalar } from "../../datatype/grid";
 
 export interface GridScalarProps {
   readonly url: string;
@@ -9,5 +9,5 @@ export interface GridScalarProps {
 
 export class GridScalarData extends ImmutableComponent<
   GridScalarProps,
-  GeoGridScalar
+  GridScalar
 > {}

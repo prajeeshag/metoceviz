@@ -1,7 +1,7 @@
 import { GridScalarData, type GridScalarProps } from "./grid-data";
 import * as zarr from "zarrita";
 import { logger } from "../../logger";
-import { GeoGridScalar } from "../../datatype/grid";
+import { GridScalar } from "../../datatype/grid";
 
 export async function fetchZarrGrid(
   props: GridScalarProps,
@@ -77,7 +77,7 @@ export async function fetchZarrGrid(
   const sliceArray = await zarr.get(arr, slice, { signal: signal } as any);
   const data = new Float32Array(sliceArray.data as any);
   const scaledData = data.map((x) => x * scale_factor + add_offset);
-  const scalar = new GeoGridScalar(
+  const scalar = new GridScalar(
     {
       x0: attrs.lon0,
       dx: attrs.dlon,
@@ -85,6 +85,9 @@ export async function fetchZarrGrid(
       y0: attrs.lat0,
       dy: attrs.dlat,
       ny: attrs.nlat,
+      isgeo: true,
+      xwrap: true,
+      ywrap: false,
     },
     scaledData,
   );

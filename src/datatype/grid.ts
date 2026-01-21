@@ -1,18 +1,22 @@
 import { logger } from "../logger";
 
-export interface GridHeader {
-  x0: number;
-  dx: number;
-  nx: number;
-  y0: number;
-  dy: number;
-  ny: number;
-}
-
-abstract class GridBase<T> {
+abstract class GridBase<T, A> {
   protected log = logger.child({ component: this.constructor.name });
 
-  constructor(public readonly header: GridHeader) {}
+  constructor(
+    public readonly header: {
+      x0: number;
+      dx: number;
+      nx: number;
+      y0: number;
+      dy: number;
+      ny: number;
+      isgeo?: boolean;
+      xwrap?: boolean;
+      ywrap?: boolean;
+    },
+    public readonly values: A,
+  ) {}
 
   public abstract isel(row: number, col: number): T;
   public abstract interpolate(lat: number, lon: number): T;
@@ -39,34 +43,31 @@ abstract class GridBase<T> {
     const fCol = (x - x0) / dx;
     const fRow = (y - y0) / dy;
 
-    const c0 = Math.floor(fCol);
-    const r0 = Math.floor(fRow);
-    const c1 = c0 + 1;
-    const r1 = r0 + 1;
+    let c0 = Math.floor(fCol);
+    let r0 = Math.floor(fRow);
+    let c1 = c0 + 1;
+    let r1 = r0 + 1;
+
+    if (this.header.xwrap && c0 < 0) {
+      c0 = nx - 1;
+    }
+    if (this.header.xwrap && c1 >= nx) {
+      c1 = 0;
+    }
+    if (this.header.ywrap && r0 < 0) {
+      r0 = ny - 1;
+    }
+    if (this.header.ywrap && r1 >= ny) {
+      r1 = 0;
+    }
 
     if (c0 < 0 || r0 < 0 || c1 >= nx || r1 >= ny) return null;
 
     return { u: fCol - c0, v: fRow - r0, r0, r1, c0, c1 };
   }
-
-  public contains(x: number, y: number): boolean {
-    const { x0, dx, nx, y0, dy, ny } = this.header;
-    const xMax = x0 + dx * (nx - 1);
-    const yMax = y0 + dy * (ny - 1);
-    const isXInRange = dx > 0 ? x >= x0 && x <= xMax : x <= x0 && x >= xMax;
-    const isYInRange = dy > 0 ? y >= y0 && y <= yMax : y <= y0 && y >= yMax;
-    return isXInRange && isYInRange;
-  }
 }
 
-export class GridScalar extends GridBase<number> {
-  constructor(
-    header: GridHeader,
-    public readonly values: Float32Array,
-  ) {
-    super(header);
-  }
-
+export class GridScalar extends GridBase<number, Float32Array> {
   public isel(j: number, i: number): number {
     return this.values[j * this.header.nx + i]!;
   }
@@ -84,19 +85,16 @@ export class GridScalar extends GridBase<number> {
   }
 
   public interpolate(x: number, y: number): number {
-    return this.interpolatexy(x, y);
-  }
-}
-
-export class GeoGridScalar extends GridScalar {
-  public override interpolate(lon: number, lat: number): number {
-    var x = lon;
-    var y = lat;
-    if (lon < 0 && this.header.x0 + this.header.dx * this.header.nx > 180) {
-      x = lon + 360;
-    } else if (lon > 180 && this.header.x0 < 0) {
-      x = lon - 360;
+    if (!this.header.isgeo) {
+      return this.interpolatexy(x, y);
     }
-    return this.interpolatexy(x, y);
+    let lon = x;
+    let lat = y;
+    if (lon < 0 && this.header.x0 + this.header.dx * this.header.nx > 180) {
+      lon = lon + 360;
+    } else if (lon > 180 && this.header.x0 < 0) {
+      lon = lon - 360;
+    }
+    return this.interpolatexy(lon, lat);
   }
 }

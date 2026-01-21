@@ -9,3 +9,6 @@ export class PixelFieldProvider extends Provider<PixelFieldProps, PixelField> {}
 export const pixelFieldAgent = new PixelFieldAgent(
   new PixelFieldProvider(getPixelField, CACHE_SIZE),
 );
+
+export const createPixelFieldAgent = () =>
+  new PixelFieldAgent(new PixelFieldProvider(getPixelField, CACHE_SIZE));

@@ -1,22 +1,14 @@
 import { logger } from "../logger";
 
-/**
- * Ensures T only contains:
- * 1. Primitives (string, number, boolean, null, undefined)
- * 2. Immutable Tuples (readonly [any, ...])
- * 3. Other Component instances (ImmutableComponent)
- */
-
 type NonNullable<T> = T extends null | undefined ? never : T;
 
-// This version is even more robust for optional properties
 export type ValidComponentProps<T> = {
   readonly [K in keyof T]: NonNullable<T[K]> extends string | number | boolean
     ? T[K]
-    : NonNullable<T[K]> extends readonly any[]
-      ? number extends NonNullable<T[K]>["length"]
-        ? never
-        : T[K]
+    : NonNullable<T[K]> extends readonly (infer U)[]
+      ? U extends string | number | boolean | ImmutableComponent<any, any>
+        ? T[K]
+        : never
       : NonNullable<T[K]> extends ImmutableComponent<any, any>
         ? T[K]
         : never;
@@ -43,14 +35,12 @@ function generateFingerPrint(obj: any): string {
 }
 
 export abstract class ImmutableComponent<T extends ValidComponentProps<T>, V> {
-  public readonly props: T;
-  private _fingerprint: string;
-  readonly value: V;
+  public readonly props: ValidComponentProps<T>;
+  public readonly value: V;
 
-  constructor(props: T, value: V) {
+  constructor(props: ValidComponentProps<T>, value: V) {
     // this.props = this.deepFreeze(props);
     this.props = props;
-    this._fingerprint = generateFingerPrint(this.props);
     this.value = value;
   }
 
@@ -63,21 +53,13 @@ export abstract class ImmutableComponent<T extends ValidComponentProps<T>, V> {
   }
 
   public getFingerprint(): string {
-    return this._fingerprint;
+    return generateFingerPrint(this.props);
   }
 
   public equals(other: unknown): boolean {
     if (this === other) return true;
     if (!(other instanceof ImmutableComponent)) return false;
     return this.getFingerprint() === other.getFingerprint();
-  }
-
-  public copy(changes: Partial<T>, value: V): this {
-    return new (this.constructor as any)({
-      ...this.props,
-      ...changes,
-      value: value,
-    });
   }
 
   private deepFreeze(obj: any): any {
@@ -106,12 +88,16 @@ export abstract class ImmutableComponent<T extends ValidComponentProps<T>, V> {
 export class Agent<K, V> {
   constructor(readonly provider: Provider<K, V>) {}
 
-  get(props: K): Promise<V> {
-    return this.provider.get(props, this);
+  get(props: K, args?: any): Promise<V> {
+    return this.provider.get(props, this, args);
   }
 }
 
-type ComputeFn<K, V> = (props: K, signal: AbortSignal) => Promise<V>;
+type ComputeFn<K, V> = (
+  props: K,
+  signal: AbortSignal,
+  args?: any,
+) => Promise<V>;
 
 export class Provider<K, V> {
   private cache = new Map<string, V>();
@@ -125,7 +111,7 @@ export class Provider<K, V> {
     private maxCacheSize: number = 1,
   ) {}
 
-  async get(props: K, agent: Agent<K, V>): Promise<V> {
+  async get(props: K, agent: Agent<K, V>, args?: any): Promise<V> {
     const stableKey = generateFingerPrint(props);
 
     // 1. Check LRU Cache
@@ -152,7 +138,7 @@ export class Provider<K, V> {
     this.logger.debug(`Computing value for ${stableKey}`);
     const computePromise = (async () => {
       try {
-        const value = await this.compute(props, controller.signal);
+        const value = await this.compute(props, controller.signal, args);
 
         if (this.maxCacheSize > 0) {
           this.cache.set(stableKey, value);

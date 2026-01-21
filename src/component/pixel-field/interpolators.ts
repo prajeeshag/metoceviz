@@ -1,6 +1,4 @@
 import { PixelField, type PixelFieldProps } from "./pixel-data";
-import { logger } from "../../logger";
-import { geoPath } from "d3";
 
 export async function getPixelField(
   props: PixelFieldProps,
@@ -11,7 +9,7 @@ export async function getPixelField(
   const gridValue = grid.value;
   const pixelFieldArray = new Float32Array(width * height);
   let lastYieldTime = performance.now();
-  const projection = globe.projection;
+  const projection = globe;
   for (let y = 0; y < height; y += 1) {
     if (signal.aborted) throw new Error("Aborted");
 
@@ -22,7 +20,6 @@ export async function getPixelField(
       pixelFieldArray[y * width + x] = value;
     }
 
-    // Yield logic to keep UI responsive
     if (performance.now() - lastYieldTime > 16) {
       await new Promise((resolve) => setTimeout(resolve, 0));
       lastYieldTime = performance.now();
@@ -42,18 +39,14 @@ function createMask(props: PixelFieldProps) {
   }
   ctx.beginPath();
   ctx.fillStyle = "rgba(255, 255, 255, 1)";
-  geoPath(props.globe.projection, ctx)({ type: "Sphere" });
+  props.globe.geoPath(ctx)({ type: "Sphere" });
   ctx.fill();
-  // 2. Extract pixel data
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const pixels = imageData.data; // This is a RGBA Uint8ClampedArray
+  const pixels = imageData.data;
 
-  // 3. Convert to a simpler 1-byte mask (0 or 1)
   const mask = new Uint8Array(props.width * props.height);
 
   for (let i = 0; i < mask.length; i++) {
-    // Check the Alpha channel (index i * 4 + 3)
-    // If it's > 0, the pixel is inside the globe
     mask[i] = pixels[i * 4 + 3]! > 0 ? 1 : 0;
   }
 
