@@ -1,4 +1,4 @@
-import { Globe } from "./globe";
+import { Globe } from "../globe";
 import { Painter, type PainterProps } from "./painter";
 import { geoGraticule } from "d3-geo";
 

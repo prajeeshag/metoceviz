@@ -3,6 +3,7 @@ import * as zarr from "zarrita";
 import { logger } from "../../logger";
 import { GridScalar } from "../../datatype/grid";
 
+
 export async function fetchZarrGrid(
   props: GridScalarProps,
   signal: AbortSignal,

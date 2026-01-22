@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "lon0": {
+      "type": "number"
+    },
+    "lat0": {
+      "type": "number"
+    },
+    "dlon": {
+      "type": "number"
+    },
+    "dlat": {
+      "type": "number"
+    },
+    "nlon": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "nlat": {
+      "type": "integer",
+      "minimum": -9007199254740991,
+      "maximum": 9007199254740991
+    },
+    "time": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "datavars": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "units": {
+            "type": "string"
+          },
+          "long_name": {
+            "type": "string"
+          },
+          "standard_name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "units",
+          "long_name",
+          "standard_name",
+          "description",
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "vectors": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "units": {
+            "type": "string"
+          },
+          "long_name": {
+            "type": "string"
+          },
+          "standard_name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "uname": {
+            "type": "string"
+          },
+          "vname": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "units",
+          "long_name",
+          "standard_name",
+          "description",
+          "uname",
+          "vname"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "xwrap": {
+      "type": "boolean"
+    },
+    "islonlat": {
+      "type": "boolean"
+    },
+    "ywrap": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "lon0",
+    "lat0",
+    "dlon",
+    "dlat",
+    "nlon",
+    "nlat",
+    "time",
+    "datavars",
+    "vectors",
+    "xwrap",
+    "islonlat",
+    "ywrap"
+  ],
+  "additionalProperties": false
+}

@@ -1,6 +1,6 @@
 import { Painter, type PainterProps } from "./painter";
-import type { PixelField } from "./pixel-field";
-import { logger } from "../logger";
+import type { PixelField } from "../pixel-field";
+import { logger } from "../../logger";
 import * as d3 from "d3";
 
 interface PColorLayerProps extends PainterProps {

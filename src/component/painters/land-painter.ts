@@ -1,6 +1,6 @@
-import { JsonData } from "./json-data";
+import { JsonData } from "../json-data";
 import { feature } from "topojson-client";
-import { Globe } from "./globe";
+import { Globe } from "../globe";
 import { Painter, type PainterProps } from "./painter";
 
 interface LandProps extends PainterProps {

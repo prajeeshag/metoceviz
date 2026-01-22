@@ -1,4 +1,4 @@
-import { ImmutableComponent, type ValidComponentProps } from "./types";
+import { ImmutableComponent, type ValidComponentProps } from "../types";
 
 export interface PainterProps {}
 

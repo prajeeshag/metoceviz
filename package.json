@@ -25,5 +25,8 @@
     "rollup-plugin-watch-globs": "^2.0.1",
     "topojson-client": "^3.1.0",
     "versor": "^0.2.0"
+  },
+  "scripts": {
+    "generate-model": "bash scripts/create_models.sh"
   }
 }
