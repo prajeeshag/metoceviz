@@ -15,12 +15,15 @@ class GraticulePainter extends Painter<GraticuleProp> {
     if (!context) {
       throw Error("Canvas 2D context is null!");
     }
+    const globe = this.props.globe;
     context.beginPath();
+    const graticule = geoGraticule().step([60, 360]);
     const strokeStyle = this.props.strokeStyle || defaultStrokeStyle;
-    this.props.globe.geoPath(context)(geoGraticule()());
+    globe.geoPath(context)(graticule());
     context.strokeStyle = strokeStyle;
     context.stroke();
   }
+
 }
 
 export default function createGraticulePainter(

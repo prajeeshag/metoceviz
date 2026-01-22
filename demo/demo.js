@@ -2,7 +2,7 @@ import { MapViz } from './js/mapviz.js';
 
 function injectStyles() {
     const styleId = "gemini-canvas-styles";
-    
+
     // Check if we already injected it
     if (document.getElementById(styleId)) return;
 
@@ -26,11 +26,11 @@ function injectStyles() {
     }
     `;
     document.head.appendChild(style);
- }
+}
 
 injectStyles()
 const myCanvas1 = document.getElementById('globe1');
-const globe1 = new MapViz(myCanvas1, 'mercator', [600, 400]);
+const globe1 = new MapViz(myCanvas1, 'lambert', [800, 600]);
 const myCanvas2 = document.getElementById('globe2');
 const globe2 = new MapViz(myCanvas2, 'orthographic', [600, 400]);
 
