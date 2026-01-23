@@ -1,0 +1,269 @@
+import json
+import xarray as xr
+import cf_xarray as cf  # noqa: F401
+import questionary
+import numpy as np
+import pandas as pd
+from dataset_model import Datavars, Vectors, Model
+import typer
+
+app = typer.Typer()
+
+
+def format_to_iso(val):
+    if isinstance(val, np.datetime64):
+        return pd.Timestamp(val).isoformat()
+    if hasattr(val, "isoformat"):
+        return val.isoformat()
+    raise ValueError("Unsupported time type")
+
+
+def get_or_ask(default: any, message: str) -> str:  # type: ignore
+    return questionary.text(message, default=default).unsafe_ask()
+
+
+def handle_lonlat(values, coord_name: str):
+    if np.ndim(values) != 1:
+        raise ValueError(f"{coord_name} must be 1D")
+
+    lon0 = values[0]
+    dlons = np.diff(values)
+    nlon = len(values)
+
+    if np.allclose(dlons, dlons[0]):
+        dlon = float(dlons[0])
+    else:
+        raise ValueError(f"{coord_name} must be uniform")
+
+    return lon0, dlon, nlon
+
+
+def check_global_grid(lon0, dlon, nlon):
+    lon_wrap = lon0 + dlon * nlon
+    return np.isclose(lon_wrap - lon0, 360)
+
+
+def get_latlon_metadata(ds, metadata: dict):
+    lons = ds.cf["longitude"]
+    lats = ds.cf["latitude"]
+
+    metadata.update(
+        {
+            "islonlat": True,
+            "ywrap": False,
+        }
+    )
+
+    lon0, dlon, nlon = handle_lonlat(lons.values, "longitude")
+    lat0, dlat, nlat = handle_lonlat(lats.values, "latitude")
+
+    metadata.update(
+        {
+            "lon0": lon0,
+            "lat0": lat0,
+            "dlon": dlon,
+            "dlat": dlat,
+            "nlon": nlon,
+            "nlat": nlat,
+        }
+    )
+    metadata["xwrap"] = check_global_grid(lon0, dlon, nlon)
+
+
+def get_time_metadata(ds):
+    return [format_to_iso(t) for t in ds.cf["time"].values]
+
+
+def skip_variables(ds):
+    return (
+        questionary.checkbox(
+            "Select variables which you want to skip:", choices=list(ds.data_vars)
+        ).unsafe_ask(),
+    )
+
+
+def handle_level_name(var: xr.DataArray, ds: xr.Dataset) -> str:
+    if "vertical" not in var.cf:
+        return ""
+
+    allvertical = ds.cf[["vertical"]]
+    vertical_found = None
+    for vertical in allvertical:
+        if vertical.name in var.dim:
+            vertical_found = vertical
+            break
+
+    if vertical_found is None:
+        return ""
+
+    return vertical_found.name
+
+
+def handle_vectors(
+    ds: xr.Dataset,
+    data_vars: list[str],
+    attributes: dict[str, any],  # type: ignore
+) -> dict[str, Vectors]:
+    vectors: dict[str, Vectors] = {}
+    vec_choices = questionary.checkbox(
+        "Select variables to group as Vectors (pairs):", choices=data_vars
+    ).unsafe_ask()
+
+    if not vec_choices:
+        return vectors
+
+    for i in range(0, len(vec_choices), 2):
+        if i + 1 < len(vec_choices):
+            v1: str = vec_choices[i]
+            v2: str = vec_choices[i + 1]
+
+            var: xr.DataArray = ds[v1]
+
+            level: str = handle_level_name(var, ds)
+
+            attrs = attributes
+
+            if attrs.get("name", None) is None:
+                attrs["name"]: str = get_or_ask(
+                    f"{v1}_{v2}", f"Vector name for ({v1}, {v2}):"
+                )
+            if attrs.get("units", None) is None:
+                attrs["units"]: str = get_or_ask(
+                    ds[v1].attrs.get("units", ""),
+                    f"Units for ({v1}, {v2}):",
+                )
+
+            if attrs.get("standard_name", None) is None:
+                attrs["standard_name"]: str = get_or_ask(
+                    ds[v1].attrs.get("standard_name", ""),
+                    f"Standard name for ({v1}, {v2}):",
+                )
+
+            if attrs.get("long_name", None) is None:
+                attrs["long_name"]: str = get_or_ask(
+                    ds[v1].attrs.get("long_name", ""),
+                    f"Long name for ({v1}, {v2}):",
+                )
+
+            if attrs.get("description", None) is None:
+                attrs["description"]: str = get_or_ask(
+                    ds[v1].attrs.get("description", ""),
+                    f"Description for ({v1}, {v2}):",
+                )
+
+            vectors[attrs["name"]] = Vectors(
+                uname=v1,
+                vname=v2,
+                level=level,
+                units=attrs["units"],
+                long_name=attrs["long_name"],
+                standard_name=attrs["standard_name"],
+                description=attrs["description"],
+            )
+    return vectors
+
+
+def handle_datavars(
+    ds: xr.Dataset,
+    data_vars: list[str],
+    attributes: dict[str, any],  # type: ignore
+) -> dict[str, Datavars]:
+    datavars: dict[str, Datavars] = {}
+    for v in data_vars:
+        attrs = attributes
+
+        if attrs.get("name", None) is None:
+            attrs["name"]: str = get_or_ask(
+                v,
+                f"Want to rename {v}? (leave as is to keep original): ",
+            )
+
+        if attrs.get("units", None) is None:
+            attrs["units"]: str = get_or_ask(
+                ds[v].attrs.get("units"), f"Units for {v}:"
+            )
+
+        if attrs.get("long_name", None) is None:
+            attrs["long_name"]: str = get_or_ask(
+                ds[v].attrs.get("long_name"), f"Long Name for {v}:"
+            )
+
+        if attrs.get("standard_name", None) is None:
+            attrs["standard_name"]: str = get_or_ask(
+                ds[v].attrs.get("standard_name"),
+                f"Standard Name for {v}:",
+            )
+
+        if attrs.get("description", None) is None:
+            attrs["description"]: str = get_or_ask(
+                ds[v].attrs.get("description", ""),
+                f"Description for {v}:",
+            )
+
+        level = handle_level_name(ds[v], ds)
+
+        datavars[attrs["name"]] = Datavars(
+            units=attrs["units"],
+            long_name=attrs["long_name"],
+            standard_name=attrs["standard_name"],
+            description=attrs["description"],
+            level=level,
+            name=v,
+        )
+
+    return datavars
+
+
+def handle_levels(ds: xr.Dataset):
+    verticals = ds.cf[["vertical"]]
+    if verticals is None:
+        return {}
+
+    levels: dict[str, list[str]] = {}
+    for v in verticals:
+        units = v.attrs.get("units", "")
+        level_data = []
+        for level in v.values:
+            level_data.append(f"{level} {units}")
+        levels[v.name] = level_data
+    return levels
+
+
+@app.command()
+def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
+    ds = xr.open_dataset(dataset_path)
+    # Load config file
+    if attr_file:
+        with open(attr_file, "r") as f:
+            attributes = json.load(f)
+    else:
+        attributes = {}
+
+    metadata = {}
+    metadata.update(get_latlon_metadata(ds, metadata))
+    metadata["time"] = get_time_metadata(ds)
+    metadata["levels"] = handle_levels(ds)
+
+    try:
+        skipped_vars = skip_variables(ds)
+        data_vars = [str(v) for v in ds.data_vars if v not in skipped_vars]
+        attributes["datavars"] = handle_datavars(
+            ds, data_vars, attributes.get("datavars", {})
+        )
+        attributes["vectors"] = handle_vectors(
+            ds, data_vars, attributes.get("vectors", {})
+        )
+    except KeyboardInterrupt:
+        print("Conversation interrupted by user")
+        exit(1)
+
+    metadata.update(attributes)
+    dataset = Model(**metadata)
+    ds.attrs.update(dataset.model_dump())
+
+    with open(attr_file, "w") as f:
+        json.dump(attributes, f)
+
+
+if __name__ == "__main__":
+    app()

@@ -1,0 +1,45 @@
+[project]
+name = "vizima"
+dynamic = ["version"]
+description = "Command-line interface for vizima visualization"
+authors = [{ name = "Prajeesh Ag", email = "prajeeshag@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "cf-xarray>=0.10.10",
+    "netcdf4>=1.7.4",
+    "questionary>=2.1.1",
+    "typer>=0.21.1",
+]
+
+[dependency-groups]
+dev = [
+    "datamodel-code-generator>=0.53.0",
+    "pytest>=9.0.2",
+    "pytest-coverage>=0.0",
+    "ruff>=0.14.13",
+    "ty>=0.0.13",
+]
+
+[project.scripts]
+vizimacli = "vizima.vizimacli.main:app"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm.build]
+excludes = ["tests", "docs", "examples"]
+
+[tool.mypy]
+plugins = ['pydantic.mypy']
+
+[tool.coverage.run]
+branch = true
+source = ["vizima"]
+omit = []
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]

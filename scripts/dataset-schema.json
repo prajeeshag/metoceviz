@@ -30,6 +30,18 @@
         "type": "string"
       }
     },
+    "levels": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
     "datavars": {
       "type": "object",
       "propertyNames": {
@@ -38,12 +50,6 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "level": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
           "units": {
             "type": "string"
           },
@@ -56,16 +62,19 @@
           "description": {
             "type": "string"
           },
+          "level": {
+            "type": "string"
+          },
           "name": {
             "type": "string"
           }
         },
         "required": [
-          "level",
           "units",
           "long_name",
           "standard_name",
           "description",
+          "level",
           "name"
         ],
         "additionalProperties": false
@@ -79,12 +88,6 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
-          "level": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
           "units": {
             "type": "string"
           },
@@ -97,6 +100,9 @@
           "description": {
             "type": "string"
           },
+          "level": {
+            "type": "string"
+          },
           "uname": {
             "type": "string"
           },
@@ -105,11 +111,11 @@
           }
         },
         "required": [
-          "level",
           "units",
           "long_name",
           "standard_name",
           "description",
+          "level",
           "uname",
           "vname"
         ],
@@ -121,9 +127,6 @@
     },
     "islonlat": {
       "type": "boolean"
-    },
-    "ywrap": {
-      "type": "boolean"
     }
   },
   "required": [
@@ -134,11 +137,11 @@
     "nlon",
     "nlat",
     "time",
+    "levels",
     "datavars",
     "vectors",
     "xwrap",
-    "islonlat",
-    "ywrap"
+    "islonlat"
   ],
   "additionalProperties": false
 }
