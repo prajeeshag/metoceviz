@@ -24,10 +24,13 @@ def test_format_to_iso_has_attr():
     assert format_to_iso(pd_dt) == "2026-01-23T18:00:00"
 
 
+def test_format_to_iso_str():
+    """Test branch 2: Objects with .isoformat() method"""
+    assert format_to_iso("2026-01-23T18:00:00") == "2026-01-23T18:00:00"
+    assert format_to_iso("2026-01-23") == "2026-01-23T00:00:00"
+
+
 def test_format_to_iso_raises_value_error():
     """Test branch 3: Unsupported types"""
-    with pytest.raises(ValueError, match="Unsupported time type"):
-        format_to_iso("2026-01-23")  # A string doesn't have .isoformat()
-
     with pytest.raises(ValueError, match="Unsupported time type"):
         format_to_iso(123456789)

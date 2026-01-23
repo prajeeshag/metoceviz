@@ -4,12 +4,11 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Extra, conint
+from pydantic import BaseModel, ConfigDict
 
 
 class Datavars(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     units: str
     long_name: str
@@ -20,8 +19,7 @@ class Datavars(BaseModel):
 
 
 class Vectors(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     units: str
     long_name: str
@@ -33,15 +31,14 @@ class Vectors(BaseModel):
 
 
 class Model(BaseModel):
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
     lon0: float
     lat0: float
     dlon: float
     dlat: float
-    nlon: conint(ge=-9007199254740991, le=9007199254740991)
-    nlat: conint(ge=-9007199254740991, le=9007199254740991)
+    nlon: int
+    nlat: int
     time: list[str]
     levels: dict[str, list[str]]
     datavars: dict[str, Datavars]

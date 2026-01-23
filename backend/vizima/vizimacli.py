@@ -1,11 +1,13 @@
 import json
-import xarray as xr
+
 import cf_xarray as cf  # noqa: F401
-import questionary
 import numpy as np
 import pandas as pd
-from dataset_model import Datavars, Vectors, Model
+import questionary
 import typer
+import xarray as xr
+
+from .dataset_model import Datavars, Model, Vectors
 
 app = typer.Typer()
 
@@ -15,6 +17,12 @@ def format_to_iso(val):
         return pd.Timestamp(val).isoformat()
     if hasattr(val, "isoformat"):
         return val.isoformat()
+    if isinstance(val, str):
+        # check if it is in isoformat
+        try:
+            return pd.Timestamp(val).isoformat()
+        except ValueError:
+            raise ValueError("Unsupported time type")
     raise ValueError("Unsupported time type")
 
 
@@ -26,21 +34,22 @@ def handle_lonlat(values, coord_name: str):
     if np.ndim(values) != 1:
         raise ValueError(f"{coord_name} must be 1D")
 
-    lon0 = values[0]
-    dlons = np.diff(values)
-    nlon = len(values)
+    l0 = values[0]
+    dl = np.diff(values)
+    nl = len(values)
 
-    if np.allclose(dlons, dlons[0]):
-        dlon = float(dlons[0])
+    if np.allclose(dl, dl[0]):
+        dl = float(dl[0])
     else:
         raise ValueError(f"{coord_name} must be uniform")
 
-    return lon0, dlon, nlon
+    return l0, dl, nl
 
 
-def check_global_grid(lon0, dlon, nlon):
+def check_periodic_lon(lon0, dlon, nlon):
     lon_wrap = lon0 + dlon * nlon
-    return np.isclose(lon_wrap - lon0, 360)
+    print(lon_wrap, lon0)
+    return True if np.isclose(lon_wrap - lon0, 360) else False
 
 
 def get_latlon_metadata(ds, metadata: dict):
@@ -67,7 +76,7 @@ def get_latlon_metadata(ds, metadata: dict):
             "nlat": nlat,
         }
     )
-    metadata["xwrap"] = check_global_grid(lon0, dlon, nlon)
+    metadata["xwrap"] = check_periodic_lon(lon0, dlon, nlon)
 
 
 def get_time_metadata(ds):

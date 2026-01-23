@@ -30,4 +30,18 @@
 ## Agent
 
 - Agent takes in request, calls Provider to create a component and returns a Promise of component instance.
--
+
+
+
+
+
+## Random ideas
+
+- Dataset describes the data and its attributes:
+  - Variables
+  - Vector variable pairs
+  - time and level information
+  - short name, standard name, long name, units, descriptions
+  - default settings for each variable: colormap, levels
+  - default settings for the dataset: projection
+

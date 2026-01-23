@@ -30,6 +30,6 @@
     "allowSyntheticDefaultImports": true,
   },
   "include": [
-    "frontend/**/*.ts",
+    "**/*.ts",
   ]
 }
