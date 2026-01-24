@@ -32,7 +32,8 @@
 - Agent takes in request, calls Provider to create a component and returns a Promise of component instance.
 
 
-
+## Fetch Cache
+- zarr chunks are cached using server side Etag and Cache-Control headers
 
 
 ## Random ideas
@@ -48,7 +49,7 @@
 
 # Roadmap
 
-- [ ] Flow Renderer
-- [ ] Vector Renderer
-- [ ] Contour Renderer
-- [ ] Image Renderer
+- [ ] Flow Animator
+- [ ] Vector Painter
+- [ ] Contour Painter
+- [ ] Image Painter

@@ -63,7 +63,6 @@ def handle_lonlat(values, coord_name: str):
 
 def check_periodic_lon(lon0, dlon, nlon):
     lon_wrap = lon0 + dlon * nlon
-    print(lon_wrap, lon0)
     return True if np.isclose(lon_wrap - lon0, 360) else False
 
 
