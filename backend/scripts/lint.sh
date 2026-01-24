@@ -2,6 +2,6 @@
 
 set -ex
 
-uv run ty check xcdo
-uv run ruff check xcdo tests
-uv run ruff format --check xcdo tests
+uv run ty check 
+uv run ruff check . 
+uv run ruff format --check . 

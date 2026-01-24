@@ -43,3 +43,7 @@ omit = []
 show_missing = true
 skip_covered = true
 exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
+
+
+[tool.ty.src]
+exclude = ["vizima/dataset_model.py"]

@@ -45,3 +45,10 @@
   - default settings for each variable: colormap, levels
   - default settings for the dataset: projection
 
+
+# Roadmap
+
+- [ ] Flow Renderer
+- [ ] Vector Renderer
+- [ ] Contour Renderer
+- [ ] Image Renderer

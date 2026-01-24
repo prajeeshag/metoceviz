@@ -12,6 +12,21 @@ from .dataset_model import Datavars, Model, Vectors
 app = typer.Typer()
 
 
+def get_packing_params(da, n_bits=16):
+    """Calculates optimal scale_factor and add_offset for signed packing."""
+    data_min = float(da.min().values)
+    data_max = float(da.max().values)
+
+    # Range of a signed n-bit integer
+    n_levels = 2**n_bits - 1
+
+    scale_factor = (data_max - data_min) / n_levels
+    # Offset is the midpoint to utilize the full signed range (-32768 to 32767)
+    add_offset = (data_max + data_min) / 2
+
+    return {"scale_factor": scale_factor, "add_offset": add_offset}
+
+
 def format_to_iso(val):
     if isinstance(val, np.datetime64):
         return pd.Timestamp(val).isoformat()
@@ -255,7 +270,8 @@ def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
 
     try:
         skipped_vars = skip_variables(ds)
-        data_vars = [str(v) for v in ds.data_vars if v not in skipped_vars]
+        ds = ds.drop_vars(skipped_vars)
+        data_vars = [str(v) for v in ds.data_vars]
         attributes["datavars"] = handle_datavars(
             ds, data_vars, attributes.get("datavars", {})
         )
@@ -265,6 +281,16 @@ def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
     except KeyboardInterrupt:
         print("Conversation interrupted by user")
         exit(1)
+
+    encoding = {}
+
+    for var in ds.data_vars:
+        encoding[var] = {
+            "dtype": "int16",
+            "_FillValue": -32767,
+            "chunks": (1, ds.lat.size, ds.lon.size),
+            **get_packing_params(ds[var]),
+        }
 
     metadata.update(attributes)
     dataset = Model(**metadata)
