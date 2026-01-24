@@ -13,25 +13,6 @@ export interface GridProps {
 }
 
 
-export interface GridScalarProps extends GridProps {
-  readonly url: string;
-}
-
-export interface GridVectorProps extends GridProps {
-  readonly uUrl: string;
-  readonly vUrl: string;
-}
-
-interface VectorValue {
-  readonly u: number;
-  readonly v: number;
-}
-
-interface VectorField {
-  readonly u: Float32Array;
-  readonly v: Float32Array;
-}
-
 export type ValidGridProps<T> = ValidComponentProps<T> & GridProps;
 
 export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>> extends ImmutableComponent<
@@ -40,7 +21,7 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
 > {
 
   abstract get(i: number, j: number): Value;
-  abstract interpolateBilinear(x: number, y: number): Value
+  abstract interpolateBilinear(x: number, y: number): Value;
   abstract interpolateNearest(x: number, y: number): Value;
 
   protected bilinear(
@@ -57,17 +38,12 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
     return top + v * (bottom - top);
   }
 
-  protected get xe(): number {
+  private get xe(): number {
     const props = this.props as GridProps;
     return props.xs + props.dx * props.nx;
   }
 
-  protected get ye(): number {
-    const props = this.props as GridProps;
-    return props.ys + props.dy * props.ny;
-  }
-
-  protected get xwrap(): boolean {
+  private get xwrap(): boolean {
     if (!this.props.islatlon) {
       return false;
     }
@@ -92,7 +68,6 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
 
     const u = fCol - i0;
 
-    console.log("before", i0, i1, x, fCol)
     if (this.xwrap) {
       if (i0 < 0) {
         i0 = nx + i0;
@@ -104,7 +79,6 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
         i1 = i1 - nx;
       }
     }
-    console.log("after", i0, i1, x, fCol)
     return { i0, j0, i1, j1, u, v };
   }
 
@@ -143,34 +117,6 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
       return lon - 360;
     }
     return lon;
-  }
-
-}
-
-
-export class GridScalarData extends GridData<Float32Array, number, GridScalarProps> {
-
-  get(i: number, j: number): number {
-    const val = this.value[i + j * this.props.nx];
-    return val === undefined ? NaN : val;
-  }
-
-  interpolateBilinear(x: number, y: number): number {
-    const ctx = this.bilinearInterpCtx(x, y);
-    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i1 >= this.props.nx || ctx.j1 >= this.props.ny) return NaN;
-
-    const v00 = this.get(ctx.i0, ctx.j0);
-    const v10 = this.get(ctx.i1, ctx.j0);
-    const v01 = this.get(ctx.i0, ctx.j1);
-    const v11 = this.get(ctx.i1, ctx.j1);
-    return this.bilinear(v00, v10, v01, v11, ctx.u, ctx.v);
-  }
-
-  interpolateNearest(x: number, y: number): number {
-    const ctx = this.nearestInterpCtx(x, y);
-    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i0 >= this.props.nx || ctx.j0 >= this.props.ny) return NaN;
-
-    return this.get(ctx.i0, ctx.j0);
   }
 
 }
