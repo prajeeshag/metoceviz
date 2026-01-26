@@ -7,7 +7,16 @@ import questionary
 import typer
 import xarray as xr
 
-from .dataset_model import Datavars, Model, Vectors
+from .dataset_model import (
+    ConicConformal,
+    Dataset,
+    DataVar,
+    Equirectangular,
+    LonLat,
+    Mercator,
+    Stereographic,
+    VectorVar,
+)
 
 app = typer.Typer()
 
@@ -126,8 +135,8 @@ def handle_vectors(
     ds: xr.Dataset,
     data_vars: list[str],
     attributes: dict[str, any],  # type: ignore
-) -> dict[str, Vectors]:
-    vectors: dict[str, Vectors] = {}
+) -> dict[str, VectorVar]:
+    vectors: dict[str, VectorVar] = {}
     vec_choices = questionary.checkbox(
         "Select variables to group as Vectors (pairs):", choices=data_vars
     ).unsafe_ask()
@@ -174,7 +183,7 @@ def handle_vectors(
                     f"Description for ({v1}, {v2}):",
                 )
 
-            vectors[attrs["name"]] = Vectors(
+            vectors[attrs["name"]] = VectorVar(
                 uname=v1,
                 vname=v2,
                 level=level,
@@ -190,8 +199,8 @@ def handle_datavars(
     ds: xr.Dataset,
     data_vars: list[str],
     attributes: dict[str, any],  # type: ignore
-) -> dict[str, Datavars]:
-    datavars: dict[str, Datavars] = {}
+) -> dict[str, DataVar]:
+    datavars: dict[str, DataVar] = {}
     for v in data_vars:
         attrs = attributes
 
@@ -225,7 +234,7 @@ def handle_datavars(
 
         level = handle_level_name(ds[v], ds)
 
-        datavars[attrs["name"]] = Datavars(
+        datavars[attrs["name"]] = DataVar(
             units=attrs["units"],
             long_name=attrs["long_name"],
             standard_name=attrs["standard_name"],
@@ -250,6 +259,43 @@ def handle_levels(ds: xr.Dataset):
             level_data.append(f"{level} {units}")
         levels[v.name] = level_data
     return levels
+
+
+def get_nx(ds: xr.Dataset) -> int:
+    """
+    Returns the horizontal length (nx) of the longitude coordinate
+    using CF conventions.
+    """
+    # cf-xarray identifies variables by standard_name, units, or common names
+    try:
+        # ds.cf.coordinates returns a mapping of standard names to list of variables
+        lon_names = ds.cf.coordinates.get("longitude", [])
+    except KeyError:
+        lon_names = []
+
+    if not lon_names:
+        raise ValueError("No longitude coordinate found in dataset via CF conventions.")
+
+    if len(lon_names) > 1:
+        raise ValueError(f"Multiple longitude coordinates found: {lon_names}")
+
+    # Access the actual DataArray
+    lon_var = ds[lon_names[0]]
+
+    # 1D case: e.g., (lon,) -> return len(lon)
+    if lon_var.ndim == 1:
+        return lon_var.sizes[lon_var.dims[0]]
+
+    # 2D case: e.g., (y, x) -> return len(x)
+    elif lon_var.ndim == 2:
+        return lon_var.sizes[lon_var.dims[1]]
+
+    else:
+        raise ValueError(f"Longitude has {lon_var.ndim} dimensions; expected 1 or 2.")
+
+
+def get_ny(ds: xr.Dataset):
+    return ds.dims.get("y", 0)
 
 
 @app.command()
@@ -292,7 +338,15 @@ def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
         }
 
     metadata.update(attributes)
-    dataset = Model(**metadata)
+    dataset = Dataset(
+        nx=metadata["nx"],
+        ny=metadata["ny"],
+        time=metadata["time"],
+        levels=metadata["levels"],
+        datavars=metadata["datavars"],
+        vectors=metadata["vectors"],
+        projection=metadata["projection"],
+    )
     ds.attrs.update(dataset.model_dump())
 
     with open(attr_file, "w") as f:

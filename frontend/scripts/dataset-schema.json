@@ -112,21 +112,11 @@
         "title": "VectorVar"
       }
     },
-    "xwrap": {
-      "type": "boolean"
-    },
-    "islonlat": {
-      "type": "boolean"
-    },
     "projection": {
       "oneOf": [
         {
           "type": "object",
           "properties": {
-            "name": {
-              "type": "string",
-              "const": "LonLat"
-            },
             "startLon": {
               "type": "number",
               "minimum": -180,
@@ -136,6 +126,10 @@
               "type": "number",
               "minimum": -90,
               "maximum": 90
+            },
+            "name": {
+              "type": "string",
+              "const": "LonLat"
             },
             "dlon": {
               "type": "number",
@@ -146,14 +140,18 @@
               "type": "number",
               "minimum": -90,
               "maximum": 90
+            },
+            "xwrap": {
+              "type": "boolean"
             }
           },
           "required": [
-            "name",
             "startLon",
             "startLat",
+            "name",
             "dlon",
-            "dlat"
+            "dlat",
+            "xwrap"
           ],
           "additionalProperties": false,
           "title": "LonLat"
@@ -161,6 +159,16 @@
         {
           "type": "object",
           "properties": {
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
@@ -171,20 +179,10 @@
               "minimum": -90,
               "maximum": 90
             },
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
             "endLon": {
               "type": "number",
               "minimum": -180,
               "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
             },
             "endLat": {
               "type": "number",
@@ -197,11 +195,11 @@
             }
           },
           "required": [
+            "startLon",
+            "startLat",
             "cenLon",
             "cenLat",
-            "startLon",
             "endLon",
-            "startLat",
             "endLat",
             "name"
           ],
@@ -211,6 +209,16 @@
         {
           "type": "object",
           "properties": {
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
@@ -221,20 +229,10 @@
               "minimum": -90,
               "maximum": 90
             },
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
             "endLon": {
               "type": "number",
               "minimum": -180,
               "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
             },
             "endLat": {
               "type": "number",
@@ -252,11 +250,11 @@
             }
           },
           "required": [
+            "startLon",
+            "startLat",
             "cenLon",
             "cenLat",
-            "startLon",
             "endLon",
-            "startLat",
             "endLat",
             "name",
             "standLon"
@@ -267,6 +265,16 @@
         {
           "type": "object",
           "properties": {
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
@@ -277,20 +285,10 @@
               "minimum": -90,
               "maximum": 90
             },
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
             "endLon": {
               "type": "number",
               "minimum": -180,
               "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
             },
             "endLat": {
               "type": "number",
@@ -313,11 +311,11 @@
             }
           },
           "required": [
+            "startLon",
+            "startLat",
             "cenLon",
             "cenLat",
-            "startLon",
             "endLon",
-            "startLat",
             "endLat",
             "name",
             "poleLon",
@@ -329,6 +327,16 @@
         {
           "type": "object",
           "properties": {
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
@@ -339,20 +347,10 @@
               "minimum": -90,
               "maximum": 90
             },
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
             "endLon": {
               "type": "number",
               "minimum": -180,
               "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
             },
             "endLat": {
               "type": "number",
@@ -380,11 +378,11 @@
             }
           },
           "required": [
+            "startLon",
+            "startLat",
             "cenLon",
             "cenLat",
-            "startLon",
             "endLon",
-            "startLat",
             "endLat",
             "name",
             "standLon",
@@ -404,8 +402,6 @@
     "levels",
     "datavars",
     "vectors",
-    "xwrap",
-    "islonlat",
     "projection"
   ],
   "additionalProperties": false,

@@ -48,3 +48,20 @@ exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:"]
 
 [tool.ty.src]
 exclude = ["vizima/dataset_model.py"]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:vizima.dataset_model",
+]
+
+[tool.datamodel-codegen]
+input-file-type = "jsonschema"
+output-model-type = "pydantic_v2.BaseModel"
+target-pydantic-version = "2.11"
+target-python-version = "3.10"
+use-title-as-name = true
+use-union-operator = true
+use-standard-collections = true
+use-annotated = true
+disable-future-imports = true
+formatters = ["ruff-format", "ruff-check"]

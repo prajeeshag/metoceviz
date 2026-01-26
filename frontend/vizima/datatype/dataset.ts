@@ -1,5 +1,4 @@
 
-import { geoEquirectangular, geoStereographic } from "d3";
 import { z } from "zod";
 
 
@@ -7,42 +6,43 @@ const lon = z.number().min(-180).max(360)
 const lat = z.number().min(-90).max(90)
 
 const ProjectionBaseSchema = z.strictObject({
+  startLon: lon,
+  startLat: lat,
+})
+
+const FixedProjectionSchema = ProjectionBaseSchema.extend({
   cenLon: lon,
   cenLat: lat,
-  startLon: lon,
   endLon: lon,
-  startLat: lat,
   endLat: lat,
 })
 
-const LonLatSchema = z.strictObject({
+const LonLatSchema = ProjectionBaseSchema.extend({
   name: z.literal("LonLat"),
-  startLon: lon,
-  startLat: lat,
   dlon: lon,
   dlat: lat,
   xwrap: z.boolean(),
 }).meta({ title: "LonLat" })
 
-const EquirectangularSchema = ProjectionBaseSchema.extend({
+const EquirectangularSchema = FixedProjectionSchema.extend({
   name: z.literal("Equirectangular"),
   poleLon: lon,
   poleLat: lat,
 }).meta({ title: "Equirectangular" })
 
-const ConicConformalSchema = ProjectionBaseSchema.extend({
+const ConicConformalSchema = FixedProjectionSchema.extend({
   name: z.literal("ConicConformal"),
   standLon: lon,
   trueLat1: lat,
   trueLat2: lat,
 }).meta({ title: "ConicConformal" })
 
-const StereographicSchema = ProjectionBaseSchema.extend({
+const StereographicSchema = FixedProjectionSchema.extend({
   name: z.literal("Stereographic"),
   standLon: lon,
 }).meta({ title: "Stereographic" })
 
-const MercatorSchema = ProjectionBaseSchema.extend({
+const MercatorSchema = FixedProjectionSchema.extend({
   name: z.literal("Mercator"),
 }).meta({ title: "Mercator" })
 
