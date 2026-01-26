@@ -103,8 +103,22 @@ def get_latlon_metadata(ds, metadata: dict):
     metadata["xwrap"] = check_periodic_lon(lon0, dlon, nlon)
 
 
-def get_time_metadata(ds):
-    return [format_to_iso(t) for t in ds.cf["time"].values]
+def get_time(ds):
+    """
+    Extracts time metadata from a xarray-like dataset using cf-xarray.
+    Returns a list of ISO-formatted strings.
+    """
+    # Check if 'time' exists in the cf-index
+    if "time" not in ds.cf:
+        return []
+
+    times = ds.cf["time"]
+
+    # Ensure values exist to avoid iteration errors on empty coords
+    if hasattr(times, "values") and len(times.values) > 0:
+        return [format_to_iso(t) for t in times.values]
+
+    return []
 
 
 def skip_variables(ds):
@@ -314,7 +328,7 @@ def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
 
     metadata = {}
     metadata.update(get_latlon_metadata(ds, metadata))
-    metadata["time"] = get_time_metadata(ds)
+    metadata["time"] = get_time(ds)
     metadata["levels"] = handle_levels(ds)
 
     try:
