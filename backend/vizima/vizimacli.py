@@ -140,6 +140,14 @@ def skip_variables(ds):
     )
 
 
+def get_lon_name_for_var(var: xr.DataArray) -> str:
+    print(var)
+    try:
+        return var.cf["longitude"].name
+    except (KeyError, AttributeError):
+        return ""
+
+
 def handle_level_name(var: xr.DataArray, ds: xr.Dataset) -> str:
     if "vertical" not in var.cf:
         return ""
