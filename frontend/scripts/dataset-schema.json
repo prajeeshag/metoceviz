@@ -2,24 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "lon0": {
-      "type": "number"
-    },
-    "lat0": {
-      "type": "number"
-    },
-    "dlon": {
-      "type": "number"
-    },
-    "dlat": {
-      "type": "number"
-    },
-    "nlon": {
+    "nx": {
       "type": "integer",
       "minimum": -9007199254740991,
       "maximum": 9007199254740991
     },
-    "nlat": {
+    "ny": {
       "type": "integer",
       "minimum": -9007199254740991,
       "maximum": 9007199254740991
@@ -77,7 +65,8 @@
           "level",
           "name"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "title": "DataVar"
       }
     },
     "vectors": {
@@ -119,7 +108,8 @@
           "uname",
           "vname"
         ],
-        "additionalProperties": false
+        "additionalProperties": false,
+        "title": "VectorVar"
       }
     },
     "xwrap": {
@@ -127,21 +117,297 @@
     },
     "islonlat": {
       "type": "boolean"
+    },
+    "projection": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "const": "LonLat"
+            },
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "dlon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "dlat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          "required": [
+            "name",
+            "startLon",
+            "startLat",
+            "dlon",
+            "dlat"
+          ],
+          "additionalProperties": false,
+          "title": "LonLat"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cenLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "cenLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "endLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "endLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "name": {
+              "type": "string",
+              "const": "Mercator"
+            }
+          },
+          "required": [
+            "cenLon",
+            "cenLat",
+            "startLon",
+            "endLon",
+            "startLat",
+            "endLat",
+            "name"
+          ],
+          "additionalProperties": false,
+          "title": "Mercator"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cenLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "cenLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "endLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "endLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "name": {
+              "type": "string",
+              "const": "Stereographic"
+            },
+            "standLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            }
+          },
+          "required": [
+            "cenLon",
+            "cenLat",
+            "startLon",
+            "endLon",
+            "startLat",
+            "endLat",
+            "name",
+            "standLon"
+          ],
+          "additionalProperties": false,
+          "title": "Stereographic"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cenLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "cenLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "endLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "endLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "name": {
+              "type": "string",
+              "const": "Equirectangular"
+            },
+            "poleLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "poleLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          "required": [
+            "cenLon",
+            "cenLat",
+            "startLon",
+            "endLon",
+            "startLat",
+            "endLat",
+            "name",
+            "poleLon",
+            "poleLat"
+          ],
+          "additionalProperties": false,
+          "title": "Equirectangular"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "cenLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "cenLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "startLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "endLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "startLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "endLat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "name": {
+              "type": "string",
+              "const": "ConicConformal"
+            },
+            "standLon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 360
+            },
+            "trueLat1": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "trueLat2": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            }
+          },
+          "required": [
+            "cenLon",
+            "cenLat",
+            "startLon",
+            "endLon",
+            "startLat",
+            "endLat",
+            "name",
+            "standLon",
+            "trueLat1",
+            "trueLat2"
+          ],
+          "additionalProperties": false,
+          "title": "ConicConformal"
+        }
+      ]
     }
   },
   "required": [
-    "lon0",
-    "lat0",
-    "dlon",
-    "dlat",
-    "nlon",
-    "nlat",
+    "nx",
+    "ny",
     "time",
     "levels",
     "datavars",
     "vectors",
     "xwrap",
-    "islonlat"
+    "islonlat",
+    "projection"
   ],
-  "additionalProperties": false
+  "additionalProperties": false,
+  "title": "Dataset"
 }

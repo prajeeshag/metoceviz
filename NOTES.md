@@ -46,6 +46,82 @@
   - default settings for each variable: colormap, levels
   - default settings for the dataset: projection
 
+- Dataset lon should be in 0 to 360 or -180 to 180 range
+
+- for wrf lambert projection:
+  ```
+    const projection = d3.geoConicConformal()
+        .parallels([TRUELAT1, TRUELAT2])
+        .center([0, MOAD_CEN_LAT])
+        .rotate([-STAND_LON, 0])
+        .scale(10000);
+    const stand_lon_point = projection([STAND_LON, MOAD_CEN_LAT]);
+    const cen_lon_point = projection([CEN_LON, MOAD_CEN_LAT]);
+    projection.translate([canvas.width / 2 + (stand_lon_point[0] - cen_lon_point[0]), canvas.height / 2 + (stand_lon_point[1] - cen_lon_point[1])]);
+
+    const bottomLeft = projection([corner_lons[1], corner_lats[1]]);
+    const topRight = projection([corner_lons[3], corner_lats[3]]);
+
+    console.log(`bottomLeft: ${bottomLeft}`);
+    console.log(`topRight: ${topRight}`);
+    console.log(`width: ${topRight[0] - bottomLeft[0]}`);
+    console.log(`height: ${topRight[1] - bottomLeft[1]}`);
+
+  ```
+
+- for wrf stereographic projection:
+  ```
+    const projection = d3.geoStereographic()
+        .rotate([-STAND_LON, -MOAD_CEN_LAT])
+        .scale(30000)
+    const stand_lon_point = projection([STAND_LON, MOAD_CEN_LAT]);
+    const cen_lon_point = projection([CEN_LON, MOAD_CEN_LAT]);
+    projection.translate([canvas.width / 2 + (stand_lon_point[0] - cen_lon_point[0]), canvas.height / 2 + (stand_lon_point[1] - cen_lon_point[1])]);
+
+    const bottomLeft = projection([corner_lons[1], corner_lats[1]]);
+    const topRight = projection([corner_lons[3], corner_lats[3]]);
+
+    console.log(`bottomLeft: ${bottomLeft}`);
+    console.log(`topRight: ${topRight}`);
+    console.log(`width: ${topRight[0] - bottomLeft[0]}`);
+    console.log(`height: ${topRight[1] - bottomLeft[1]}`);
+  ```
+
+- for wrf mercator projection:
+  ```
+    const projection = d3.geoMercator()
+        .rotate([-CEN_LON, 0])
+        .center([0, MOAD_CEN_LAT])
+        .translate([width / 2, height / 2])
+        .scale(10000);
+
+    const bottomLeft = projection([corner_lons[1], corner_lats[1]]);
+    const topRight = projection([corner_lons[3], corner_lats[3]]);
+
+    console.log(`bottomLeft: ${bottomLeft}`);
+    console.log(`topRight: ${topRight}`);
+    console.log(`width: ${topRight[0] - bottomLeft[0]}`);
+    console.log(`height: ${topRight[1] - bottomLeft[1]}`);
+  ```
+
+- for wrf rotated pole latlon projection:
+  ```
+    const projection = d3.geoEquirectangular()
+      .rotate([-attrs.POLE_LON, attrs.POLE_LAT - 90])
+      .scale(3000)
+    projection.translate([canvas.width / 2, canvas.height / 2]);
+    const cen_lon_point = projection([attrs.CEN_LON, attrs.MOAD_CEN_LAT]);
+    projection.translate([canvas.width - cen_lon_point[0], canvas.height - cen_lon_point[1]]);
+
+    const bottomLeft = projection([corner_lons[1], corner_lats[1]]);
+    const topRight = projection([corner_lons[3], corner_lats[3]]);
+
+    console.log(`bottomLeft: ${bottomLeft}`);
+    console.log(`topRight: ${topRight}`);
+    console.log(`width: ${topRight[0] - bottomLeft[0]}`);
+    console.log(`height: ${topRight[1] - bottomLeft[1]}`);
+  ```
+  STAND_LON must be equal to -POLE_LON
 
 # Roadmap
 

@@ -1,6 +1,9 @@
 import { ImmutableComponent, type ValidComponentProps } from "../types";
+import { alignLongitude } from "./utils";
 
 export interface GridProps {
+  readonly xsGlobal: number;
+  readonly ysGlobal: number;
   readonly xs: number; // x coordinate start
   readonly ys: number; // y coordinate start
   readonly dx: number; // x coordinate step
@@ -38,11 +41,6 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
     return top + v * (bottom - top);
   }
 
-  private get xe(): number {
-    const props = this.props as GridProps;
-    return props.xs + props.dx * props.nx;
-  }
-
   private get xwrap(): boolean {
     if (!this.props.islatlon) {
       return false;
@@ -53,7 +51,7 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
   }
 
   protected bilinearInterpCtx(x: number, y: number) {
-    x = this.sanitizeLon(x);
+    x = this.alignLongitude(x);
     const props = this.props as GridProps;
     const { xs, dx, nx, ys, dy, ny } = props;
     const fCol = (x - xs) / dx;
@@ -84,7 +82,7 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
 
 
   protected nearestInterpCtx(x: number, y: number) {
-    x = this.sanitizeLon(x);
+    x = this.alignLongitude(x);
     const props = this.props as GridProps;
     const { xs, dx, nx, ys, dy, ny } = props;
     const fCol = (x - xs) / dx;
@@ -106,17 +104,11 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
   }
 
 
-  protected sanitizeLon(lon: number): number {
+  protected alignLongitude(lon: number): number {
     const props = this.props as GridProps;
     if (!props.islatlon) {
       return lon;
     }
-    if (lon < 0 && this.xe > 180) {
-      return lon + 360;
-    } else if (lon > 180 && props.xs < 0) {
-      return lon - 360;
-    }
-    return lon;
+    return alignLongitude(props.xs, lon);
   }
-
 }

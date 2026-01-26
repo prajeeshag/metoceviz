@@ -4,8 +4,11 @@ export async function getPixelField(
   props: PixelFieldProps,
   signal: AbortSignal,
 ): Promise<PixelField> {
+
   const { width, height, globe, grid } = props;
+
   const mask = createMask(props);
+
   const gridValue = grid.value;
   const pixelFieldArray = new Float32Array(width * height);
   let lastYieldTime = performance.now();

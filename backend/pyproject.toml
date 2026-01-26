@@ -10,6 +10,7 @@ dependencies = [
     "netcdf4>=1.7.4",
     "questionary>=2.1.1",
     "typer>=0.21.1",
+    "zarr>=2,<3",
 ]
 
 [dependency-groups]
