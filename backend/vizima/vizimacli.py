@@ -141,9 +141,15 @@ def skip_variables(ds):
 
 
 def get_lon_name_for_var(var: xr.DataArray) -> str:
-    print(var)
     try:
         return var.cf["longitude"].name
+    except (KeyError, AttributeError):
+        return ""
+
+
+def get_lat_name_for_var(var: xr.DataArray) -> str:
+    try:
+        return var.cf["latitude"].name
     except (KeyError, AttributeError):
         return ""
 
