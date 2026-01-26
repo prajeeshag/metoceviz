@@ -1,4 +1,5 @@
 import json
+import typing as t
 
 import cf_xarray as cf  # noqa: F401
 import numpy as np
@@ -261,47 +262,50 @@ def handle_levels(ds: xr.Dataset):
     return levels
 
 
-def get_nx(ds: xr.Dataset) -> int:
+def get_nxy(ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]) -> int:
     """
     Returns the horizontal length (nx) of the longitude coordinate
     using CF conventions.
     """
-    # cf-xarray identifies variables by standard_name, units, or common names
+
     try:
-        # ds.cf.coordinates returns a mapping of standard names to list of variables
-        lon_names = ds.cf.coordinates.get("longitude", [])
+        names = ds.cf.coordinates.get(coord_name, [])
     except KeyError:
-        lon_names = []
+        names = []
 
-    if not lon_names:
-        raise ValueError("No longitude coordinate found in dataset via CF conventions.")
+    if not names:
+        raise ValueError(
+            f"No {coord_name} coordinate found in dataset via CF conventions."
+        )
 
-    if len(lon_names) > 1:
-        raise ValueError(f"Multiple longitude coordinates found: {lon_names}")
+    if len(names) > 1:
+        raise ValueError(f"Multiple {coord_name} coordinates found: {names}")
 
-    # Access the actual DataArray
-    lon_var = ds[lon_names[0]]
+    var = ds[names[0]]
 
-    # 1D case: e.g., (lon,) -> return len(lon)
-    if lon_var.ndim == 1:
-        return lon_var.sizes[lon_var.dims[0]]
+    if var.ndim == 1:
+        return var.sizes[var.dims[0]]
 
-    # 2D case: e.g., (y, x) -> return len(x)
-    elif lon_var.ndim == 2:
-        return lon_var.sizes[lon_var.dims[1]]
-
+    elif var.ndim == 2:
+        if coord_name == "longitude":
+            return var.sizes[var.dims[1]]
+        return var.sizes[var.dims[0]]
     else:
-        raise ValueError(f"Longitude has {lon_var.ndim} dimensions; expected 1 or 2.")
+        raise ValueError(f"{coord_name} has {var.ndim} dimensions; expected 1 or 2.")
 
 
-def get_ny(ds: xr.Dataset):
-    return ds.dims.get("y", 0)
+def get_ny(ds: xr.Dataset) -> int:
+    return get_nxy(ds, "latitude")
+
+
+def get_nx(ds: xr.Dataset) -> int:
+    return get_nxy(ds, "longitude")
 
 
 @app.command()
 def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
     ds = xr.open_dataset(dataset_path)
-    # Load config file
+
     if attr_file:
         with open(attr_file, "r") as f:
             attributes = json.load(f)
