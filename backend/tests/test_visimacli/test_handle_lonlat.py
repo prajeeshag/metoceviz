@@ -1,51 +1,69 @@
+import typing as t
+from dataclasses import dataclass
+
 import numpy as np
 import pytest
+import xarray as xr
+from vizima.dataset_model import LatAxis, LonAxis
 from vizima.vizimacli import handle_lonlat
 
-
-def test_handle_lonlat_valid():
-    """Test with a standard uniform 1D array."""
-    values = np.array([10.0, 11.0, 12.0, 13.0])
-    lon0, dlon, nlon = handle_lonlat(values, "longitude")
-
-    assert lon0 == 10.0
-    assert dlon == 1.0
-    assert nlon == 4
-    assert isinstance(dlon, float)
+# --- The Tests ---
 
 
-def test_handle_lonlat_floats_precision():
-    """Test with floating point precision using np.linspace."""
-    values = np.linspace(0, 1, 11)  # 0.0, 0.1, ..., 1.0
-    lon0, dlon, nlon = handle_lonlat(values, "lat")
+def test_handle_lonlat_1d_longitude():
+    # Setup 1D Lon: [0, 10, 20] -> count 3
+    ds = xr.Dataset(
+        coords={
+            "lon": (
+                ["lon"],
+                [0.0, 10.0, 20.0],
+                {"axis": "X", "units": "degrees_east"},
+            )
+        }
+    )
+    # Using cf-xarray logic: we assume .cf(['longitude']) works
+    # If you haven't imported cf_xarray in your module, ensure it's loaded.
 
-    assert lon0 == 0.0
-    assert dlon == pytest.approx(0.1)
-    assert nlon == 11
+    result = handle_lonlat(ds, "longitude")
+
+    assert "lon" in result
+    assert isinstance(result["lon"], LonAxis)
+    assert result["lon"].start == 0.0
+    assert result["lon"].end == 20.0
+    assert result["lon"].count == 3
+
+
+def test_handle_lonlat_2d_latitude():
+    # Setup 2D Lat: Shape (5, 10) -> count should be shape[0] = 5
+    lat_vals = np.zeros((5, 10))
+    lat_vals[0, 0] = -90.0
+    lat_vals[-1, -1] = 90.0
+
+    ds = xr.Dataset(
+        coords={"lat_2d": (["y", "x"], lat_vals, {"units": "degrees_north"})}
+    )
+
+    result = handle_lonlat(ds, "latitude")
+
+    assert result["lat_2d"].start == -90.0
+    assert result["lat_2d"].end == 90.0
+    assert result["lat_2d"].count == 5  # dimind 0 for latitude
+
+
+def test_handle_lonlat_invalid_coord_name():
+    ds = xr.Dataset()
+    with pytest.raises(
+        ValueError, match="coord_name must be 'longitude' or 'latitude'"
+    ):
+        handle_lonlat(ds, "altitude")  # type: ignore
 
 
 def test_handle_lonlat_invalid_ndim():
-    """Should raise ValueError if input is 2D."""
-    values = np.array([[1, 2], [3, 4]])
-    with pytest.raises(ValueError, match="lon must be 1D"):
-        handle_lonlat(values, "lon")
+    # Create 3D coordinates which should fail
+    vals = np.zeros((2, 2, 2))
+    ds = xr.Dataset(
+        coords={"lon_3d": (["x", "y", "z"], vals, {"standard_name": "longitude"})}
+    )
 
-
-def test_handle_lonlat_non_uniform():
-    """Should raise ValueError if the spacing is inconsistent."""
-    values = np.array([0, 1, 3, 4])  # jump from 1 to 3
-    with pytest.raises(ValueError, match="longitude must be uniform"):
-        handle_lonlat(values, "longitude")
-
-
-@pytest.mark.parametrize(
-    "values, expected_dlon",
-    [
-        (np.array([100, 150, 200]), 50.0),
-        (np.array([0, -0.5, -1.0]), -0.5),
-    ],
-)
-def test_handle_lonlat_various_scales(values, expected_dlon):
-    """Parameterized test for different directions and scales."""
-    lon0, dlon, nlon = handle_lonlat(values, "coord")
-    assert dlon == expected_dlon
+    with pytest.raises(ValueError, match="Dimension of longitude should be 1 or 2"):
+        handle_lonlat(ds, "longitude")

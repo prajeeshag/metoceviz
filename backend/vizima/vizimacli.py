@@ -1,4 +1,3 @@
-import json
 import typing as t
 
 import cf_xarray as cf  # noqa: F401
@@ -7,12 +6,16 @@ import pandas as pd
 import questionary
 import typer
 import xarray as xr
+from numpy.char import count
+from pydantic import TypeAdapter, ValidationError
 
 from .dataset_model import (
     ConicConformal,
     Dataset,
     DataVar,
     Equirectangular,
+    LatAxis,
+    LonAxis,
     LonLat,
     Mercator,
     Stereographic,
@@ -20,6 +23,13 @@ from .dataset_model import (
 )
 
 app = typer.Typer()
+
+WRF_PROJ_ID_MAPPING = {
+    1: "ConicConformal",
+    2: "Stereographic",
+    3: "Mercator",
+    6: "Equirectangular",
+}
 
 
 def get_packing_params(da, n_bits=16):
@@ -51,24 +61,58 @@ def format_to_iso(val):
     raise ValueError("Unsupported time type")
 
 
-def get_or_ask(default: any, message: str) -> str:  # type: ignore
+def ask_text(default: any, message: str) -> str:  # type: ignore
     return questionary.text(message, default=default).unsafe_ask()
 
 
-def handle_lonlat(values, coord_name: str):
-    if np.ndim(values) != 1:
-        raise ValueError(f"{coord_name} must be 1D")
+def handle_lonlat(
+    ds: xr.Dataset, coord_name: t.Literal["longitude", "latitude"]
+) -> dict[str, LonAxis | LatAxis]:
+    match coord_name:
+        case "longitude":
+            AxisClass = LonAxis
+            dimind = 1
+        case "latitude":
+            AxisClass = LatAxis
+            dimind = 0
+        case _:
+            raise ValueError(
+                f"coord_name must be 'longitude' or 'latitude'. Got {coord_name}!!"
+            )
 
-    l0 = values[0]
-    dl = np.diff(values)
-    nl = len(values)
+    names = ds.cf.coordinates[coord_name]
 
-    if np.allclose(dl, dl[0]):
-        dl = float(dl[0])
-    else:
-        raise ValueError(f"{coord_name} must be uniform")
+    axis = {}
+    print("names==", names)
 
-    return l0, dl, nl
+    for name in names:
+        coord = ds[name]
+        match coord.values.ndim:
+            case 1:
+                axis[coord.name] = AxisClass(
+                    start=coord.values[0],
+                    end=coord.values[-1],
+                    count=len(coord.values),
+                )
+            case 2:
+                axis[coord.name] = AxisClass(
+                    start=coord.values[0, 0],
+                    end=coord.values[-1, -1],
+                    count=coord.values.shape[dimind],
+                )
+            case _:
+                raise ValueError(
+                    f"Dimension of {coord_name} should be 1 or 2. Got {coord.values.ndim} for {coord.name}"
+                )
+    return axis
+
+
+def handle_lon(ds: xr.Dataset) -> dict[str, LonAxis]:
+    return handle_lonlat(ds, "longitude")  # ty:ignore[invalid-return-type]
+
+
+def handle_lat(ds: xr.Dataset) -> dict[str, LatAxis]:
+    return handle_lonlat(ds, "latitude")  # ty:ignore[invalid-return-type]
 
 
 def check_periodic_lon(lon0, dlon, nlon):
@@ -76,49 +120,19 @@ def check_periodic_lon(lon0, dlon, nlon):
     return True if np.isclose(lon_wrap - lon0, 360) else False
 
 
-def get_latlon_metadata(ds, metadata: dict):
-    lons = ds.cf["longitude"]
-    lats = ds.cf["latitude"]
-
-    metadata.update(
-        {
-            "islonlat": True,
-            "ywrap": False,
-        }
-    )
-
-    lon0, dlon, nlon = handle_lonlat(lons.values, "longitude")
-    lat0, dlat, nlat = handle_lonlat(lats.values, "latitude")
-
-    metadata.update(
-        {
-            "lon0": lon0,
-            "lat0": lat0,
-            "dlon": dlon,
-            "dlat": dlat,
-            "nlon": nlon,
-            "nlat": nlat,
-        }
-    )
-    metadata["xwrap"] = check_periodic_lon(lon0, dlon, nlon)
-
-
-def get_time(ds):
+def get_time(ds) -> dict[str, list[str]]:
     """
     Extracts time metadata from a xarray-like dataset using cf-xarray.
     Returns a list of ISO-formatted strings.
     """
     # Check if 'time' exists in the cf-index
     if "time" not in ds.cf:
-        return []
-
+        return {}
     times = ds.cf["time"]
-
     # Ensure values exist to avoid iteration errors on empty coords
     if hasattr(times, "values") and len(times.values) > 0:
-        return [format_to_iso(t) for t in times.values]
-
-    return []
+        return {times.name: [format_to_iso(t) for t in times.values]}
+    return {}
 
 
 def skip_variables(ds):
@@ -149,7 +163,6 @@ def handle_level_name(var: xr.DataArray, ds: xr.Dataset) -> str:
 def handle_vectors(
     ds: xr.Dataset,
     data_vars: list[str],
-    attributes: dict[str, any],  # type: ignore
 ) -> dict[str, VectorVar]:
     vectors: dict[str, VectorVar] = {}
     vec_choices = questionary.checkbox(
@@ -164,44 +177,43 @@ def handle_vectors(
             v1: str = vec_choices[i]
             v2: str = vec_choices[i + 1]
 
-            var: xr.DataArray = ds[v1]
+            var1: xr.DataArray = ds[v1]
+            var2: xr.DataArray = ds[v2]
 
-            level: str = handle_level_name(var, ds)
+            levelv1: str = handle_level_name(var1, ds)
+            levelv2: str = handle_level_name(var2, ds)
+            if levelv1 != levelv2:
+                raise ValueError(f"Warning: Levels don't match for ({v1}, {v2})")
 
-            attrs = attributes
+            attrs: dict[str, any] = {}  # type: ignore
 
-            if attrs.get("name", None) is None:
-                attrs["name"]: str = get_or_ask(
-                    f"{v1}_{v2}", f"Vector name for ({v1}, {v2}):"
-                )
-            if attrs.get("units", None) is None:
-                attrs["units"]: str = get_or_ask(
-                    ds[v1].attrs.get("units", ""),
-                    f"Units for ({v1}, {v2}):",
-                )
+            attrs["name"]: str = ask_text(
+                f"{v1}_{v2}", f"Vector name for ({v1}, {v2}):"
+            )
+            attrs["units"]: str = ask_text(
+                ds[v1].attrs.get("units", ""),
+                f"Units for ({v1}, {v2}):",
+            )
 
-            if attrs.get("standard_name", None) is None:
-                attrs["standard_name"]: str = get_or_ask(
-                    ds[v1].attrs.get("standard_name", ""),
-                    f"Standard name for ({v1}, {v2}):",
-                )
+            attrs["standard_name"]: str = ask_text(
+                ds[v1].attrs.get("standard_name", ""),
+                f"Standard name for ({v1}, {v2}):",
+            )
 
-            if attrs.get("long_name", None) is None:
-                attrs["long_name"]: str = get_or_ask(
-                    ds[v1].attrs.get("long_name", ""),
-                    f"Long name for ({v1}, {v2}):",
-                )
+            attrs["long_name"]: str = ask_text(
+                ds[v1].attrs.get("long_name", ""),
+                f"Long name for ({v1}, {v2}):",
+            )
 
-            if attrs.get("description", None) is None:
-                attrs["description"]: str = get_or_ask(
-                    ds[v1].attrs.get("description", ""),
-                    f"Description for ({v1}, {v2}):",
-                )
+            attrs["description"]: str = ask_text(
+                ds[v1].attrs.get("description", ""),
+                f"Description for ({v1}, {v2}):",
+            )
 
             vectors[attrs["name"]] = VectorVar(
                 uname=v1,
                 vname=v2,
-                level=level,
+                level=levelv1,
                 units=attrs["units"],
                 long_name=attrs["long_name"],
                 standard_name=attrs["standard_name"],
@@ -213,39 +225,31 @@ def handle_vectors(
 def handle_datavars(
     ds: xr.Dataset,
     data_vars: list[str],
-    attributes: dict[str, any],  # type: ignore
 ) -> dict[str, DataVar]:
     datavars: dict[str, DataVar] = {}
     for v in data_vars:
-        attrs = attributes
+        attrs: dict[str, any] = {}  # type: ignore
 
-        if attrs.get("name", None) is None:
-            attrs["name"]: str = get_or_ask(
-                v,
-                f"Want to rename {v}? (leave as is to keep original): ",
-            )
+        attrs["name"]: str = ask_text(
+            v,
+            f"Want to rename {v}? (leave as is to keep original): ",
+        )
 
-        if attrs.get("units", None) is None:
-            attrs["units"]: str = get_or_ask(
-                ds[v].attrs.get("units"), f"Units for {v}:"
-            )
+        attrs["units"]: str = ask_text(ds[v].attrs.get("units"), f"Units for {v}:")
 
-        if attrs.get("long_name", None) is None:
-            attrs["long_name"]: str = get_or_ask(
-                ds[v].attrs.get("long_name"), f"Long Name for {v}:"
-            )
+        attrs["long_name"]: str = ask_text(
+            ds[v].attrs.get("long_name"), f"Long Name for {v}:"
+        )
 
-        if attrs.get("standard_name", None) is None:
-            attrs["standard_name"]: str = get_or_ask(
-                ds[v].attrs.get("standard_name"),
-                f"Standard Name for {v}:",
-            )
+        attrs["standard_name"]: str = ask_text(
+            ds[v].attrs.get("standard_name"),
+            f"Standard Name for {v}:",
+        )
 
-        if attrs.get("description", None) is None:
-            attrs["description"]: str = get_or_ask(
-                ds[v].attrs.get("description", ""),
-                f"Description for {v}:",
-            )
+        attrs["description"]: str = ask_text(
+            ds[v].attrs.get("description", ""),
+            f"Description for {v}:",
+        )
 
         level = handle_level_name(ds[v], ds)
 
@@ -276,12 +280,12 @@ def handle_levels(ds: xr.Dataset):
     return levels
 
 
-def get_nxy(ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]) -> int:
+def get_coord(
+    ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]
+) -> xr.DataArray:
     """
-    Returns the horizontal length (nx) of the longitude coordinate
-    using CF conventions.
+    Returns the coordinate array for the given coordinate name.
     """
-
     try:
         names = ds.cf.coordinates.get(coord_name, [])
     except KeyError:
@@ -295,7 +299,15 @@ def get_nxy(ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]) -> i
     if len(names) > 1:
         raise ValueError(f"Multiple {coord_name} coordinates found: {names}")
 
-    var = ds[names[0]]
+    return ds[names[0]]
+
+
+def get_nxy(ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]) -> int:
+    """
+    Returns the horizontal length (nx) of the longitude coordinate
+    using CF conventions.
+    """
+    var = get_coord(ds, coord_name)
 
     if var.ndim == 1:
         return var.sizes[var.dims[0]]
@@ -316,59 +328,149 @@ def get_nx(ds: xr.Dataset) -> int:
     return get_nxy(ds, "longitude")
 
 
+def get_proj_name_from_ds(ds: xr.Dataset) -> str:
+    """
+    Get the projection name from the dataset.
+    """
+    proj_name = ds.attrs.get("projection", "")
+    if proj_name not in PROJECTION_MAPPING:
+        # WRF PROJ
+        proj_id = ds.attrs.get("MAP_PROJ", -1)
+        proj_name = WRF_PROJ_ID_MAPPING.get(proj_id, "")
+    return proj_name
+
+
+def get_cen_lon_from_ds(ds: xr.Dataset) -> float | None:
+    """
+    Get the center longitude from the dataset.
+    """
+    return ds.attrs.get("center_longitude", None)
+
+
+def process_conic_conformal(ds: xr.Dataset) -> ConicConformal:
+    """
+    Process conic conformal projection.
+    """
+    truelat1 = ds.attrs.get("TRUELAT1", None)
+    if truelat1 is None:
+        raise ValueError("truelat1 not found in dataset attributes")
+
+    truelat2 = ds.attrs.get("TRUELAT2", None)
+    if truelat2 is None:
+        raise ValueError("truelat2 not found in dataset attributes")
+
+    cen_lon = ds.attrs.get("CEN_LON", None)
+    if cen_lon is None:
+        raise ValueError("cen_lon not found in dataset attributes")
+
+    cen_lat = ds.attrs.get("CEN_LAT", None)
+    if cen_lat is None:
+        raise ValueError("cen_lat not found in dataset attributes")
+
+    stand_lon = ds.attrs.get("STAND_LON", None)
+    if stand_lon is None:
+        raise ValueError("stand_lon not found in dataset attributes")
+
+    corner_lats = ds.attrs.get("corner_lats", None)
+    if corner_lats is None:
+        raise ValueError("corner_lats not found in dataset attributes")
+    start_lat: float = corner_lats[0]
+    end_lat: float = corner_lats[2]
+
+    corner_lons = ds.attrs.get("corner_lons", None)
+    if corner_lons is None:
+        raise ValueError("corner_lons not found in dataset attributes")
+    start_lon: float = corner_lats[0]
+    end_lon: float = corner_lats[2]
+
+    return ConicConformal(
+        name="ConicConformal",
+        startLon=start_lon,
+        startLat=start_lat,
+        cenLon=cen_lon,
+        cenLat=cen_lat,
+        endLon=end_lon,
+        endLat=end_lat,
+        standLon=stand_lon,
+        trueLat1=truelat1,
+        trueLat2=truelat2,
+    )
+
+
+def process_equirectangular(ds: xr.Dataset) -> Equirectangular:
+    """
+    Process equirectangular projection.
+    """
+    raise NotImplementedError("Equirectangular projection not implemented yet")
+
+
+def process_mercator(ds: xr.Dataset) -> Mercator:
+    """
+    Process mercator projection.
+    """
+    raise NotImplementedError("Mercator projection not implemented yet")
+
+
+def process_stereographic(ds: xr.Dataset) -> Stereographic:
+    """
+    Process stereographic projection.
+    """
+    raise NotImplementedError("Stereographic projection not implemented yet")
+
+
+PROJECTION_MAPPING = {
+    "LonLat": "",
+    "Mercator": process_mercator,
+    "Stereographic": process_stereographic,
+    "Equirectangular": process_equirectangular,
+    "ConicConformal": process_conic_conformal,
+}
+
+
+def handle_projection(
+    ds: xr.Dataset,
+) -> LonLat | ConicConformal | Equirectangular | Mercator | Stereographic:
+    """
+    Handle projection detection and return appropriate projection object.
+    """
+    proj_name = get_proj_name_from_ds(ds)
+
+    if not proj_name:
+        if questionary.confirm("Is this data in regular lat-lon projection?").ask():
+            proj_name = "LonLat"
+    return PROJECTION_MAPPING[proj_name](ds)
+
+
 @app.command()
-def process_dataset(dataset_path: str, output_path: str, attr_file: str = ""):
+def create_metadata(dataset_path: str, output_path: str):
     ds = xr.open_dataset(dataset_path)
 
-    if attr_file:
-        with open(attr_file, "r") as f:
-            attributes = json.load(f)
-    else:
-        attributes = {}
-
-    metadata = {}
-    metadata.update(get_latlon_metadata(ds, metadata))
-    metadata["time"] = get_time(ds)
-    metadata["levels"] = handle_levels(ds)
+    nx = get_nx(ds)
+    ny = get_ny(ds)
+    times = get_time(ds)
+    levels = handle_levels(ds)
+    projection = handle_projection(ds)
 
     try:
         skipped_vars = skip_variables(ds)
         ds = ds.drop_vars(skipped_vars)
         data_vars = [str(v) for v in ds.data_vars]
-        attributes["datavars"] = handle_datavars(
-            ds, data_vars, attributes.get("datavars", {})
-        )
-        attributes["vectors"] = handle_vectors(
-            ds, data_vars, attributes.get("vectors", {})
-        )
+        datavars = handle_datavars(ds, data_vars)
+        vectors = handle_vectors(ds, data_vars)
     except KeyboardInterrupt:
         print("Conversation interrupted by user")
         exit(1)
 
-    encoding = {}
-
-    for var in ds.data_vars:
-        encoding[var] = {
-            "dtype": "int16",
-            "_FillValue": -32767,
-            "chunks": (1, ds.lat.size, ds.lon.size),
-            **get_packing_params(ds[var]),
-        }
-
-    metadata.update(attributes)
     dataset = Dataset(
-        nx=metadata["nx"],
-        ny=metadata["ny"],
-        time=metadata["time"],
-        levels=metadata["levels"],
-        datavars=metadata["datavars"],
-        vectors=metadata["vectors"],
-        projection=metadata["projection"],
+        nx=nx,
+        ny=ny,
+        times=times,
+        levels=levels,
+        projection=projection,
+        datavars=datavars,
+        vectors=vectors,
     )
     ds.attrs.update(dataset.model_dump())
-
-    with open(attr_file, "w") as f:
-        json.dump(attributes, f)
 
 
 if __name__ == "__main__":

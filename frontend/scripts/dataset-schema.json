@@ -2,20 +2,86 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "nx": {
-      "type": "integer",
-      "minimum": -9007199254740991,
-      "maximum": 9007199254740991
-    },
-    "ny": {
-      "type": "integer",
-      "minimum": -9007199254740991,
-      "maximum": 9007199254740991
-    },
-    "time": {
-      "type": "array",
-      "items": {
+    "lons": {
+      "type": "object",
+      "propertyNames": {
         "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 360,
+            "description": "Longitude at (0,0)"
+          },
+          "end": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 360,
+            "description": "Longitude at (nx,ny)"
+          },
+          "count": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "count"
+        ],
+        "additionalProperties": false,
+        "title": "LonAxis"
+      }
+    },
+    "lats": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude at (0,0)"
+          },
+          "end": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude at (nx,ny)"
+          },
+          "count": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "count"
+        ],
+        "additionalProperties": false,
+        "title": "LatAxis"
+      }
+    },
+    "times": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
       }
     },
     "levels": {
@@ -50,10 +116,19 @@
           "description": {
             "type": "string"
           },
+          "name": {
+            "type": "string"
+          },
+          "lon": {
+            "type": "string"
+          },
+          "lat": {
+            "type": "string"
+          },
           "level": {
             "type": "string"
           },
-          "name": {
+          "time": {
             "type": "string"
           }
         },
@@ -62,8 +137,11 @@
           "long_name",
           "standard_name",
           "description",
+          "name",
+          "lon",
+          "lat",
           "level",
-          "name"
+          "time"
         ],
         "additionalProperties": false,
         "title": "DataVar"
@@ -89,9 +167,6 @@
           "description": {
             "type": "string"
           },
-          "level": {
-            "type": "string"
-          },
           "uname": {
             "type": "string"
           },
@@ -104,7 +179,6 @@
           "long_name",
           "standard_name",
           "description",
-          "level",
           "uname",
           "vname"
         ],
@@ -117,41 +191,13 @@
         {
           "type": "object",
           "properties": {
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
             "name": {
               "type": "string",
               "const": "LonLat"
-            },
-            "dlon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "dlat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
-            "xwrap": {
-              "type": "boolean"
             }
           },
           "required": [
-            "startLon",
-            "startLat",
-            "name",
-            "dlon",
-            "dlat",
-            "xwrap"
+            "name"
           ],
           "additionalProperties": false,
           "title": "LonLat"
@@ -159,35 +205,17 @@
         {
           "type": "object",
           "properties": {
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
-              "maximum": 360
+              "maximum": 360,
+              "description": "Central longitude"
             },
             "cenLat": {
               "type": "number",
               "minimum": -90,
-              "maximum": 90
-            },
-            "endLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "endLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
+              "maximum": 90,
+              "description": "Central latitude"
             },
             "name": {
               "type": "string",
@@ -195,12 +223,8 @@
             }
           },
           "required": [
-            "startLon",
-            "startLat",
             "cenLon",
             "cenLat",
-            "endLon",
-            "endLat",
             "name"
           ],
           "additionalProperties": false,
@@ -209,35 +233,17 @@
         {
           "type": "object",
           "properties": {
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
-              "maximum": 360
+              "maximum": 360,
+              "description": "Central longitude"
             },
             "cenLat": {
               "type": "number",
               "minimum": -90,
-              "maximum": 90
-            },
-            "endLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "endLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
+              "maximum": 90,
+              "description": "Central latitude"
             },
             "name": {
               "type": "string",
@@ -250,12 +256,8 @@
             }
           },
           "required": [
-            "startLon",
-            "startLat",
             "cenLon",
             "cenLat",
-            "endLon",
-            "endLat",
             "name",
             "standLon"
           ],
@@ -265,35 +267,17 @@
         {
           "type": "object",
           "properties": {
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
-              "maximum": 360
+              "maximum": 360,
+              "description": "Central longitude"
             },
             "cenLat": {
               "type": "number",
               "minimum": -90,
-              "maximum": 90
-            },
-            "endLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "endLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
+              "maximum": 90,
+              "description": "Central latitude"
             },
             "name": {
               "type": "string",
@@ -311,12 +295,8 @@
             }
           },
           "required": [
-            "startLon",
-            "startLat",
             "cenLon",
             "cenLat",
-            "endLon",
-            "endLat",
             "name",
             "poleLon",
             "poleLat"
@@ -327,35 +307,17 @@
         {
           "type": "object",
           "properties": {
-            "startLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "startLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
-            },
             "cenLon": {
               "type": "number",
               "minimum": -180,
-              "maximum": 360
+              "maximum": 360,
+              "description": "Central longitude"
             },
             "cenLat": {
               "type": "number",
               "minimum": -90,
-              "maximum": 90
-            },
-            "endLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360
-            },
-            "endLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90
+              "maximum": 90,
+              "description": "Central latitude"
             },
             "name": {
               "type": "string",
@@ -378,12 +340,8 @@
             }
           },
           "required": [
-            "startLon",
-            "startLat",
             "cenLon",
             "cenLat",
-            "endLon",
-            "endLat",
             "name",
             "standLon",
             "trueLat1",
@@ -396,9 +354,9 @@
     }
   },
   "required": [
-    "nx",
-    "ny",
-    "time",
+    "lons",
+    "lats",
+    "times",
     "levels",
     "datavars",
     "vectors",

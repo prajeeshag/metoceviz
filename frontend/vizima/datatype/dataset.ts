@@ -5,24 +5,30 @@ import { z } from "zod";
 const lon = z.number().min(-180).max(360)
 const lat = z.number().min(-90).max(90)
 
-const ProjectionBaseSchema = z.strictObject({
-  startLon: lon,
-  startLat: lat,
+const LonAxis = z.strictObject({
+  start: lon.meta({ description: "Longitude at (0,0)" }),
+  end: lon.meta({ description: "Longitude at (nx,ny)" }),
+  count: z.number().int().positive(),
+}).meta({ title: "LonAxis" })
+
+const LatAxis = z.strictObject({
+  start: lat.meta({ description: "Latitude at (0,0)" }),
+  end: lat.meta({ description: "Latitude at (nx,ny)" }),
+  count: z.number().int().positive(),
+}).meta({ title: "LatAxis" })
+
+const FixedProjectionSchema = z.strictObject({
+  cenLon: lon.meta({ description: "Central longitude" }),
+  cenLat: lat.meta({ description: "Central latitude" }),
 })
 
-const FixedProjectionSchema = ProjectionBaseSchema.extend({
-  cenLon: lon,
-  cenLat: lat,
-  endLon: lon,
-  endLat: lat,
-})
-
-const LonLatSchema = ProjectionBaseSchema.extend({
+const LonLatSchema = z.strictObject({
   name: z.literal("LonLat"),
-  dlon: lon,
-  dlat: lat,
-  xwrap: z.boolean(),
 }).meta({ title: "LonLat" })
+
+const MercatorSchema = FixedProjectionSchema.extend({
+  name: z.literal("Mercator"),
+}).meta({ title: "Mercator" })
 
 const EquirectangularSchema = FixedProjectionSchema.extend({
   name: z.literal("Equirectangular"),
@@ -42,20 +48,19 @@ const StereographicSchema = FixedProjectionSchema.extend({
   standLon: lon,
 }).meta({ title: "Stereographic" })
 
-const MercatorSchema = FixedProjectionSchema.extend({
-  name: z.literal("Mercator"),
-}).meta({ title: "Mercator" })
-
 const VarSchema = z.strictObject({
   units: z.string(),
   long_name: z.string(),
   standard_name: z.string(),
   description: z.string(),
-  level: z.string(),
 });
 
 export const DataVarSchema = VarSchema.extend({
   name: z.string(),
+  lon: z.string(),
+  lat: z.string(),
+  level: z.string(),
+  time: z.string(),
 }).meta({ title: "DataVar" });
 
 export const VectorVarSchema = VarSchema.extend({
@@ -64,9 +69,9 @@ export const VectorVarSchema = VarSchema.extend({
 }).meta({ title: "VectorVar" });
 
 export const DatasetSchema = z.strictObject({
-  nx: z.number().int(),
-  ny: z.number().int(),
-  time: z.array(z.string()),
+  lons: z.record(z.string(), LonAxis),
+  lats: z.record(z.string(), LatAxis),
+  times: z.record(z.string(), z.array(z.string())),
   levels: z.record(z.string(), z.array(z.string())),
   datavars: z.record(z.string(), DataVarSchema),
   vectors: z.record(z.string(), VectorVarSchema),
