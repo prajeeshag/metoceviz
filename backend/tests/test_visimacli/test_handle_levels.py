@@ -33,3 +33,17 @@ def test_handle_levels_missing_units():
     results = handle_levels(ds)
 
     assert results["depth"] == ["5", "10"]
+
+
+def test_handle_levels_scalar_coordinate():
+    ds = xr.Dataset(
+        data_vars={"temp": (("x",), [25.0])},
+        coords={
+            "x": [1],
+            "level": ((), 500, {"units": "hPa", "positive": "up"}),
+        },
+    )
+
+    results = handle_levels(ds)
+
+    assert results == {}

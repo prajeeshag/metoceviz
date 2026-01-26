@@ -119,19 +119,17 @@ def check_periodic_lon(lon0, dlon, nlon):
     return True if np.isclose(lon_wrap - lon0, 360) else False
 
 
-def get_time(ds) -> dict[str, list[str]]:
-    """
-    Extracts time metadata from a xarray-like dataset using cf-xarray.
-    Returns a list of ISO-formatted strings.
-    """
-    # Check if 'time' exists in the cf-index
-    if "time" not in ds.cf:
+def handle_times(ds) -> dict[str, list[str]]:
+    names = ds.cf.coordinates.get("time", [])
+    if not names:
         return {}
-    times = ds.cf["time"]
-    # Ensure values exist to avoid iteration errors on empty coords
-    if hasattr(times, "values") and len(times.values) > 0:
-        return {times.name: [format_to_iso(t) for t in times.values]}
-    return {}
+    times = {}
+    for name in names:
+        time = ds[name]
+        if time.values.ndim == 0:
+            continue
+        times[time.name] = [format_to_iso(t) for t in time.values]
+    return times
 
 
 def skip_variables(ds):
@@ -264,14 +262,14 @@ def handle_datavars(
     return datavars
 
 
-def handle_levels(ds: xr.Dataset):
+def handle_levels(ds: xr.Dataset) -> dict[str, list[str]]:
     names = ds.cf.coordinates.get("vertical", [])
-    print(names)
-    print(ds)
     levels: dict[str, list[str]] = {}
 
     for name in names:
         units = ds[name].attrs.get("units", "")
+        if ds[name].values.ndim == 0:
+            continue
         levels[name] = [f"{val} {units}".strip() for val in ds[name].values]
 
     return levels
@@ -396,7 +394,7 @@ def create_metadata(dataset_path: str, output_path: str):
 
     nx = get_nx(ds)
     ny = get_ny(ds)
-    times = get_time(ds)
+    times = handle_times(ds)
     levels = handle_levels(ds)
     projection = handle_projection(ds)
 
