@@ -80,10 +80,9 @@ def handle_lonlat(
                 f"coord_name must be 'longitude' or 'latitude'. Got {coord_name}!!"
             )
 
-    names = ds.cf.coordinates[coord_name]
+    names = ds.cf.coordinates.get(coord_name, [])
 
     axis = {}
-    print("names==", names)
 
     for name in names:
         coord = ds[name]
@@ -266,66 +265,16 @@ def handle_datavars(
 
 
 def handle_levels(ds: xr.Dataset):
-    verticals = ds.cf[["vertical"]]
-    if verticals is None:
-        return {}
-
+    names = ds.cf.coordinates.get("vertical", [])
+    print(names)
+    print(ds)
     levels: dict[str, list[str]] = {}
-    for v in verticals:
-        units = v.attrs.get("units", "")
-        level_data = []
-        for level in v.values:
-            level_data.append(f"{level} {units}")
-        levels[v.name] = level_data
+
+    for name in names:
+        units = ds[name].attrs.get("units", "")
+        levels[name] = [f"{val} {units}".strip() for val in ds[name].values]
+
     return levels
-
-
-def get_coord(
-    ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]
-) -> xr.DataArray:
-    """
-    Returns the coordinate array for the given coordinate name.
-    """
-    try:
-        names = ds.cf.coordinates.get(coord_name, [])
-    except KeyError:
-        names = []
-
-    if not names:
-        raise ValueError(
-            f"No {coord_name} coordinate found in dataset via CF conventions."
-        )
-
-    if len(names) > 1:
-        raise ValueError(f"Multiple {coord_name} coordinates found: {names}")
-
-    return ds[names[0]]
-
-
-def get_nxy(ds: xr.Dataset, coord_name: t.Literal["latitude", "longitude"]) -> int:
-    """
-    Returns the horizontal length (nx) of the longitude coordinate
-    using CF conventions.
-    """
-    var = get_coord(ds, coord_name)
-
-    if var.ndim == 1:
-        return var.sizes[var.dims[0]]
-
-    elif var.ndim == 2:
-        if coord_name == "longitude":
-            return var.sizes[var.dims[1]]
-        return var.sizes[var.dims[0]]
-    else:
-        raise ValueError(f"{coord_name} has {var.ndim} dimensions; expected 1 or 2.")
-
-
-def get_ny(ds: xr.Dataset) -> int:
-    return get_nxy(ds, "latitude")
-
-
-def get_nx(ds: xr.Dataset) -> int:
-    return get_nxy(ds, "longitude")
 
 
 def get_proj_name_from_ds(ds: xr.Dataset) -> str:

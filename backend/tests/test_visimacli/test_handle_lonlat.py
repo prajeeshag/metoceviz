@@ -50,6 +50,21 @@ def test_handle_lonlat_2d_latitude():
     assert result["lat_2d"].count == 5  # dimind 0 for latitude
 
 
+def test_handle_lonlat_no_coordinates():
+    # Setup 2D Lat: Shape (5, 10) -> count should be shape[0] = 5
+    lat_vals = np.zeros((5, 10))
+    lat_vals[0, 0] = -90.0
+    lat_vals[-1, -1] = 90.0
+
+    ds = xr.Dataset(
+        coords={"lat_2d": (["y", "x"], lat_vals, {"units": "degrees_north"})}
+    )
+
+    result = handle_lonlat(ds, "longitude")
+
+    assert result == {}
+
+
 def test_handle_lonlat_invalid_coord_name():
     ds = xr.Dataset()
     with pytest.raises(
