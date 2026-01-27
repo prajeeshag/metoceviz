@@ -1,4 +1,7 @@
+import json
+import logging
 import typing as t
+from pathlib import Path
 
 import cf_xarray as cf  # noqa: F401
 import numpy as np
@@ -6,6 +9,7 @@ import pandas as pd
 import questionary
 import typer
 import xarray as xr
+from pydantic import BaseModel
 
 from .dataset_model import (
     ConicConformal,
@@ -20,7 +24,15 @@ from .dataset_model import (
     VectorVar,
 )
 
-app = typer.Typer()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(levelname)s : %(name)s | %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+app = typer.Typer(add_completion=False)
 
 WRF_PROJ_ID_MAPPING = {
     1: "ConicConformal",
@@ -131,11 +143,9 @@ def handle_times(ds) -> dict[str, list[str]]:
 
 
 def skip_variables(ds):
-    return (
-        questionary.checkbox(
-            "Select variables which you want to skip:", choices=list(ds.data_vars)
-        ).unsafe_ask(),
-    )
+    return questionary.checkbox(
+        "Select variables which you want to skip:", choices=list(ds.data_vars)
+    ).unsafe_ask()
 
 
 def get_lon_name_for_var(var: xr.DataArray) -> str:
@@ -152,10 +162,21 @@ def get_lat_name_for_var(var: xr.DataArray) -> str:
         return ""
 
 
-def get_vertical_name_for_var(var: xr.DataArray) -> str:
+def get_vertical_name_for_var(
+    var: xr.DataArray,
+    ds_verticals: dict[str, list[str]],
+) -> str:
     try:
-        return var.cf["vertical"].name
+        vname = var.cf["vertical"].name
     except (KeyError, AttributeError):
+        return ""
+
+    if vname in ds_verticals:
+        return vname
+    else:
+        logger.warning(
+            f"Vertical coordinate `{vname}` for variable `{var.name}` not found in dataset!"
+        )
         return ""
 
 
@@ -169,6 +190,7 @@ def get_time_name_for_var(var: xr.DataArray) -> str:
 def handle_vectors(
     ds: xr.Dataset,
     data_vars: list[str],
+    ds_verticals: dict[str, list[str]],
 ) -> dict[str, VectorVar]:
     vectors: dict[str, VectorVar] = {}
     vec_choices = questionary.checkbox(
@@ -186,8 +208,8 @@ def handle_vectors(
             var1: xr.DataArray = ds[v1]
             var2: xr.DataArray = ds[v2]
 
-            levelv1: str = get_vertical_name_for_var(var1)
-            levelv2: str = get_vertical_name_for_var(var2)
+            levelv1: str = get_vertical_name_for_var(var1, ds_verticals)
+            levelv2: str = get_vertical_name_for_var(var2, ds_verticals)
             if levelv1 != levelv2:
                 raise ValueError(f"Levels don't match for ({v1}, {v2})")
 
@@ -198,35 +220,28 @@ def handle_vectors(
 
             attrs: dict[str, any] = {}  # type: ignore
 
-            attrs["name"]: str = ask_text(
-                f"{v1}_{v2}", f"Vector name for ({v1}, {v2}):"
-            )
-            attrs["units"]: str = ask_text(
+            name: str = ask_text(f"{v1}_{v2}", f"Vector name for ({v1}, {v2}):")
+            units: str = ask_text(
                 ds[v1].attrs.get("units", ""),
                 f"Units for ({v1}, {v2}):",
             )
 
-            attrs["standard_name"]: str = ask_text(
+            standard_name: str = ask_text(
                 ds[v1].attrs.get("standard_name", ""),
                 f"Standard name for ({v1}, {v2}):",
             )
 
-            attrs["long_name"]: str = ask_text(
+            long_name: str = ask_text(
                 ds[v1].attrs.get("long_name", ""),
                 f"Long name for ({v1}, {v2}):",
             )
 
-            attrs["description"]: str = ask_text(
-                ds[v1].attrs.get("description", ""),
-                f"Description for ({v1}, {v2}):",
-            )
-
-            vectors[attrs["name"]] = VectorVar(
+            vectors[name] = VectorVar(
                 uArrName=v1,
                 vArrName=v2,
-                units=attrs["units"],
-                long_name=attrs["long_name"],
-                standard_name=attrs["standard_name"],
+                units=units,
+                long_name=long_name,
+                standard_name=standard_name,
             )
     return vectors
 
@@ -234,6 +249,7 @@ def handle_vectors(
 def handle_datavars(
     ds: xr.Dataset,
     data_vars: list[str],
+    ds_verticals: dict[str, list[str]],
 ) -> dict[str, DataVar]:
     datavars: dict[str, DataVar] = {}
     for v in data_vars:
@@ -251,7 +267,7 @@ def handle_datavars(
             f"Standard Name for {v}:",
         )
 
-        level = get_vertical_name_for_var(ds[v])
+        level = get_vertical_name_for_var(ds[v], ds_verticals)
         lon = get_lon_name_for_var(ds[v])
         lat = get_lat_name_for_var(ds[v])
         time = get_time_name_for_var(ds[v])
@@ -410,8 +426,15 @@ def handle_projection(
 
 
 @app.command()
-def create_metadata(dataset_path: str, output_path: str):
-    ds = xr.open_dataset(dataset_path)
+def prepare_metadata(
+    dataset_file: t.Annotated[
+        Path, typer.Argument(help="Path to the dataset file", exists=True)
+    ],
+    metadata_file: t.Annotated[
+        Path, typer.Option(help="Path to save the metadata json file")
+    ] = Path("dataset_meta.json"),
+):
+    ds = xr.open_dataset(dataset_file)
 
     times = handle_times(ds)
     levels = handle_levels(ds)
@@ -421,10 +444,9 @@ def create_metadata(dataset_path: str, output_path: str):
 
     try:
         skipped_vars = skip_variables(ds)
-        ds = ds.drop_vars(skipped_vars)
-        data_vars = [str(v) for v in ds.data_vars]
-        datavars = handle_datavars(ds, data_vars)
-        vectors = handle_vectors(ds, data_vars)
+        data_vars = [str(v) for v in ds.data_vars if str(v) not in skipped_vars]
+        datavars = handle_datavars(ds, data_vars, levels)
+        vectors = handle_vectors(ds, data_vars, levels)
         title = ask_text("", "Title for this dataset: ")
         subtitle = ask_text("", "Subtitle for this dataset: ")
         description = ask_text("", "Description for this dataset: ")
@@ -432,6 +454,7 @@ def create_metadata(dataset_path: str, output_path: str):
         print("Conversation interrupted by user")
         exit(1)
 
+    # This is just for validation
     dataset = Dataset(
         lons=lons,
         lats=lats,
@@ -445,7 +468,50 @@ def create_metadata(dataset_path: str, output_path: str):
         description=description,
     )
 
-    print(dataset.model_dump())
+    metadata = dataset.model_dump()
+
+    del metadata["times"]
+    del metadata["lons"]
+    del metadata["lats"]
+    del metadata["levels"]
+
+    metadata_file.parent.mkdir(parents=True, exist_ok=True)
+    with open(metadata_file, "w") as f:
+        json.dump(metadata, f, indent=2)
+
+    print(f"Metadata saved to {metadata_file}")
+
+
+def process_dataset(
+    dataset_file: t.Annotated[
+        Path,
+        typer.Argument(
+            help="Path to the dataset file", exists=True, file_okay=True, dir_okay=False
+        ),
+    ],
+    metadata_file: t.Annotated[
+        Path,
+        typer.Option(
+            help="Path to the metadata json file",
+            exists=True,
+            file_okay=True,
+            dir_okay=False,
+        ),
+    ],
+    out: t.Annotated[
+        Path,
+        typer.Option(help="Path to save the processed dataset"),
+    ] = Path("dataset.zarr"),
+):
+    ds = xr.open_dataset(dataset_file)
+    metadata = json.load(open(metadata_file))
+
+    dataarrays = metadata["dataarrays"]
+
+    out_ds = xr.Dataset()
+
+    for _, dataarray in dataarrays.items():
+        out_ds[dataarray["name"]] = ds[dataarray["name"]]
 
 
 if __name__ == "__main__":

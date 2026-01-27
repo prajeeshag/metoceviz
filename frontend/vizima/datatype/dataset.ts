@@ -82,8 +82,8 @@ export const DatasetSchema = z.strictObject({
     EquirectangularSchema,
     ConicConformalSchema
   ]),
-  title: z.string().length(100),
-  subtitle: z.string().length(150),
+  title: z.string().max(100),
+  subtitle: z.string().max(150),
   description: z.string(),
 }).meta({ title: "Dataset" })
 

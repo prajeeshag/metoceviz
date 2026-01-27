@@ -332,12 +332,10 @@
     },
     "title": {
       "type": "string",
-      "minLength": 100,
       "maxLength": 100
     },
     "subtitle": {
       "type": "string",
-      "minLength": 150,
       "maxLength": 150
     },
     "description": {

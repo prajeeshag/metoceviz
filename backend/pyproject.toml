@@ -23,7 +23,7 @@ dev = [
 ]
 
 [project.scripts]
-vizimacli = "vizima.vizimacli.main:app"
+vizimacli = "vizima.vizimacli:app"
 
 [build-system]
 requires = ["pdm-backend"]
