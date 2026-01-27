@@ -6,8 +6,6 @@ import pandas as pd
 import questionary
 import typer
 import xarray as xr
-from numpy.char import count
-from pydantic import TypeAdapter, ValidationError
 
 from .dataset_model import (
     ConicConformal,
@@ -65,7 +63,7 @@ def ask_text(default: any, message: str) -> str:  # type: ignore
     return questionary.text(message, default=default).unsafe_ask()
 
 
-def handle_lonlat(
+def handle_lonlats(
     ds: xr.Dataset, coord_name: t.Literal["longitude", "latitude"]
 ) -> dict[str, LonAxis | LatAxis]:
     match coord_name:
@@ -106,12 +104,12 @@ def handle_lonlat(
     return axis
 
 
-def handle_lon(ds: xr.Dataset) -> dict[str, LonAxis]:
-    return handle_lonlat(ds, "longitude")  # ty:ignore[invalid-return-type]
+def handle_lons(ds: xr.Dataset) -> dict[str, LonAxis]:
+    return handle_lonlats(ds, "longitude")  # ty:ignore[invalid-return-type]
 
 
-def handle_lat(ds: xr.Dataset) -> dict[str, LatAxis]:
-    return handle_lonlat(ds, "latitude")  # ty:ignore[invalid-return-type]
+def handle_lats(ds: xr.Dataset) -> dict[str, LatAxis]:
+    return handle_lonlats(ds, "latitude")  # ty:ignore[invalid-return-type]
 
 
 def check_periodic_lon(lon0, dlon, nlon):
@@ -154,21 +152,18 @@ def get_lat_name_for_var(var: xr.DataArray) -> str:
         return ""
 
 
-def handle_level_name(var: xr.DataArray, ds: xr.Dataset) -> str:
-    if "vertical" not in var.cf:
+def get_vertical_name_for_var(var: xr.DataArray) -> str:
+    try:
+        return var.cf["vertical"].name
+    except (KeyError, AttributeError):
         return ""
 
-    allvertical = ds.cf[["vertical"]]
-    vertical_found = None
-    for vertical in allvertical:
-        if vertical.name in var.dim:
-            vertical_found = vertical
-            break
 
-    if vertical_found is None:
+def get_time_name_for_var(var: xr.DataArray) -> str:
+    try:
+        return var.cf["time"].name
+    except (KeyError, AttributeError):
         return ""
-
-    return vertical_found.name
 
 
 def handle_vectors(
@@ -191,10 +186,15 @@ def handle_vectors(
             var1: xr.DataArray = ds[v1]
             var2: xr.DataArray = ds[v2]
 
-            levelv1: str = handle_level_name(var1, ds)
-            levelv2: str = handle_level_name(var2, ds)
+            levelv1: str = get_vertical_name_for_var(var1)
+            levelv2: str = get_vertical_name_for_var(var2)
             if levelv1 != levelv2:
-                raise ValueError(f"Warning: Levels don't match for ({v1}, {v2})")
+                raise ValueError(f"Levels don't match for ({v1}, {v2})")
+
+            timev1: str = get_time_name_for_var(var1)
+            timev2: str = get_time_name_for_var(var2)
+            if timev1 != timev2:
+                raise ValueError(f"Time don't match for ({v1}, {v2})")
 
             attrs: dict[str, any] = {}  # type: ignore
 
@@ -222,13 +222,11 @@ def handle_vectors(
             )
 
             vectors[attrs["name"]] = VectorVar(
-                uname=v1,
-                vname=v2,
-                level=levelv1,
+                uArrName=v1,
+                vArrName=v2,
                 units=attrs["units"],
                 long_name=attrs["long_name"],
                 standard_name=attrs["standard_name"],
-                description=attrs["description"],
             )
     return vectors
 
@@ -239,38 +237,34 @@ def handle_datavars(
 ) -> dict[str, DataVar]:
     datavars: dict[str, DataVar] = {}
     for v in data_vars:
-        attrs: dict[str, any] = {}  # type: ignore
-
-        attrs["name"]: str = ask_text(
+        name: str = ask_text(
             v,
             f"Want to rename {v}? (leave as is to keep original): ",
         )
 
-        attrs["units"]: str = ask_text(ds[v].attrs.get("units"), f"Units for {v}:")
+        units: str = ask_text(ds[v].attrs.get("units"), f"Units for {v}:")
 
-        attrs["long_name"]: str = ask_text(
-            ds[v].attrs.get("long_name"), f"Long Name for {v}:"
-        )
+        long_name: str = ask_text(ds[v].attrs.get("long_name"), f"Long Name for {v}:")
 
-        attrs["standard_name"]: str = ask_text(
+        standard_name: str = ask_text(
             ds[v].attrs.get("standard_name"),
             f"Standard Name for {v}:",
         )
 
-        attrs["description"]: str = ask_text(
-            ds[v].attrs.get("description", ""),
-            f"Description for {v}:",
-        )
+        level = get_vertical_name_for_var(ds[v])
+        lon = get_lon_name_for_var(ds[v])
+        lat = get_lat_name_for_var(ds[v])
+        time = get_time_name_for_var(ds[v])
 
-        level = handle_level_name(ds[v], ds)
-
-        datavars[attrs["name"]] = DataVar(
-            units=attrs["units"],
-            long_name=attrs["long_name"],
-            standard_name=attrs["standard_name"],
-            description=attrs["description"],
+        datavars[name] = DataVar(
+            units=units,
+            long_name=long_name,
+            standard_name=standard_name,
             level=level,
-            name=v,
+            arrName=v,
+            lon=lon,
+            lat=lat,
+            time=time,
         )
 
     return datavars
@@ -290,22 +284,12 @@ def handle_levels(ds: xr.Dataset) -> dict[str, list[str]]:
 
 
 def get_proj_name_from_ds(ds: xr.Dataset) -> str:
-    """
-    Get the projection name from the dataset.
-    """
     proj_name = ds.attrs.get("projection", "")
     if proj_name not in PROJECTION_MAPPING:
         # WRF PROJ
         proj_id = ds.attrs.get("MAP_PROJ", -1)
         proj_name = WRF_PROJ_ID_MAPPING.get(proj_id, "")
     return proj_name
-
-
-def get_cen_lon_from_ds(ds: xr.Dataset) -> float | None:
-    """
-    Get the center longitude from the dataset.
-    """
-    return ds.attrs.get("center_longitude", None)
 
 
 def process_conic_conformal(ds: xr.Dataset) -> ConicConformal:
@@ -332,26 +316,10 @@ def process_conic_conformal(ds: xr.Dataset) -> ConicConformal:
     if stand_lon is None:
         raise ValueError("stand_lon not found in dataset attributes")
 
-    corner_lats = ds.attrs.get("corner_lats", None)
-    if corner_lats is None:
-        raise ValueError("corner_lats not found in dataset attributes")
-    start_lat: float = corner_lats[0]
-    end_lat: float = corner_lats[2]
-
-    corner_lons = ds.attrs.get("corner_lons", None)
-    if corner_lons is None:
-        raise ValueError("corner_lons not found in dataset attributes")
-    start_lon: float = corner_lats[0]
-    end_lon: float = corner_lats[2]
-
     return ConicConformal(
         name="ConicConformal",
-        startLon=start_lon,
-        startLat=start_lat,
         cenLon=cen_lon,
         cenLat=cen_lat,
-        endLon=end_lon,
-        endLat=end_lat,
         standLon=stand_lon,
         trueLat1=truelat1,
         trueLat2=truelat2,
@@ -362,25 +330,61 @@ def process_equirectangular(ds: xr.Dataset) -> Equirectangular:
     """
     Process equirectangular projection.
     """
-    raise NotImplementedError("Equirectangular projection not implemented yet")
+    cen_lon = ds.attrs.get("CEN_LON", None)
+    if cen_lon is None:
+        raise ValueError("cen_lon not found in dataset attributes")
+
+    cen_lat = ds.attrs.get("CEN_LAT", None)
+    if cen_lat is None:
+        raise ValueError("cen_lat not found in dataset attributes")
+
+    pole_lon = ds.attrs.get("POLE_LON", None)
+    if pole_lon is None:
+        raise ValueError("pole_lon not found in dataset attributes")
+
+    pole_lat = ds.attrs.get("POLE_LAT", None)
+    if pole_lat is None:
+        raise ValueError("pole_lat not found in dataset attributes")
+
+    return Equirectangular(
+        name="Equirectangular",
+        cenLon=cen_lon,
+        cenLat=cen_lat,
+        poleLon=pole_lon,
+        poleLat=pole_lat,
+    )
 
 
 def process_mercator(ds: xr.Dataset) -> Mercator:
-    """
-    Process mercator projection.
-    """
-    raise NotImplementedError("Mercator projection not implemented yet")
+    return Mercator(name="Mercator")
+
+
+def process_lonlat(ds: xr.Dataset) -> LonLat:
+    return LonLat(name="LonLat")
 
 
 def process_stereographic(ds: xr.Dataset) -> Stereographic:
-    """
-    Process stereographic projection.
-    """
-    raise NotImplementedError("Stereographic projection not implemented yet")
+    cen_lon = ds.attrs.get("CEN_LON", None)
+    if cen_lon is None:
+        raise ValueError("cen_lon not found in dataset attributes")
+
+    cen_lat = ds.attrs.get("CEN_LAT", None)
+    if cen_lat is None:
+        raise ValueError("cen_lat not found in dataset attributes")
+
+    stand_lon = ds.attrs.get("STAND_LON", None)
+    if stand_lon is None:
+        raise ValueError("stand_lon not found in dataset attributes")
+    return Stereographic(
+        name="Stereographic",
+        cenLat=cen_lat,
+        cenLon=cen_lon,
+        standLon=stand_lon,
+    )
 
 
 PROJECTION_MAPPING = {
-    "LonLat": "",
+    "LonLat": process_lonlat,
     "Mercator": process_mercator,
     "Stereographic": process_stereographic,
     "Equirectangular": process_equirectangular,
@@ -399,17 +403,20 @@ def handle_projection(
     if not proj_name:
         if questionary.confirm("Is this data in regular lat-lon projection?").ask():
             proj_name = "LonLat"
-    return PROJECTION_MAPPING[proj_name](ds)
+    try:
+        return PROJECTION_MAPPING[proj_name](ds)
+    except KeyError:
+        raise ValueError(f"Unsupported projection or no projection found: {proj_name}")
 
 
 @app.command()
 def create_metadata(dataset_path: str, output_path: str):
     ds = xr.open_dataset(dataset_path)
 
-    nx = get_nx(ds)
-    ny = get_ny(ds)
     times = handle_times(ds)
     levels = handle_levels(ds)
+    lons = handle_lons(ds)
+    lats = handle_lats(ds)
     projection = handle_projection(ds)
 
     try:
@@ -418,20 +425,27 @@ def create_metadata(dataset_path: str, output_path: str):
         data_vars = [str(v) for v in ds.data_vars]
         datavars = handle_datavars(ds, data_vars)
         vectors = handle_vectors(ds, data_vars)
+        title = ask_text("", "Title for this dataset: ")
+        subtitle = ask_text("", "Subtitle for this dataset: ")
+        description = ask_text("", "Description for this dataset: ")
     except KeyboardInterrupt:
         print("Conversation interrupted by user")
         exit(1)
 
     dataset = Dataset(
-        nx=nx,
-        ny=ny,
+        lons=lons,
+        lats=lats,
         times=times,
         levels=levels,
-        projection=projection,
         datavars=datavars,
         vectors=vectors,
+        projection=projection,
+        title=title,
+        subtitle=subtitle,
+        description=description,
     )
-    ds.attrs.update(dataset.model_dump())
+
+    print(dataset.model_dump())
 
 
 if __name__ == "__main__":

@@ -113,10 +113,7 @@
           "standard_name": {
             "type": "string"
           },
-          "description": {
-            "type": "string"
-          },
-          "name": {
+          "arrName": {
             "type": "string"
           },
           "lon": {
@@ -136,8 +133,7 @@
           "units",
           "long_name",
           "standard_name",
-          "description",
-          "name",
+          "arrName",
           "lon",
           "lat",
           "level",
@@ -164,13 +160,10 @@
           "standard_name": {
             "type": "string"
           },
-          "description": {
+          "uArrName": {
             "type": "string"
           },
-          "uname": {
-            "type": "string"
-          },
-          "vname": {
+          "vArrName": {
             "type": "string"
           }
         },
@@ -178,9 +171,8 @@
           "units",
           "long_name",
           "standard_name",
-          "description",
-          "uname",
-          "vname"
+          "uArrName",
+          "vArrName"
         ],
         "additionalProperties": false,
         "title": "VectorVar"
@@ -205,26 +197,12 @@
         {
           "type": "object",
           "properties": {
-            "cenLon": {
-              "type": "number",
-              "minimum": -180,
-              "maximum": 360,
-              "description": "Central longitude"
-            },
-            "cenLat": {
-              "type": "number",
-              "minimum": -90,
-              "maximum": 90,
-              "description": "Central latitude"
-            },
             "name": {
               "type": "string",
               "const": "Mercator"
             }
           },
           "required": [
-            "cenLon",
-            "cenLat",
             "name"
           ],
           "additionalProperties": false,
@@ -351,6 +329,19 @@
           "title": "ConicConformal"
         }
       ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 100,
+      "maxLength": 100
+    },
+    "subtitle": {
+      "type": "string",
+      "minLength": 150,
+      "maxLength": 150
+    },
+    "description": {
+      "type": "string"
     }
   },
   "required": [
@@ -360,7 +351,10 @@
     "levels",
     "datavars",
     "vectors",
-    "projection"
+    "projection",
+    "title",
+    "subtitle",
+    "description"
   ],
   "additionalProperties": false,
   "title": "Dataset"

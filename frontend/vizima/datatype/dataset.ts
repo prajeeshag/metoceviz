@@ -26,7 +26,7 @@ const LonLatSchema = z.strictObject({
   name: z.literal("LonLat"),
 }).meta({ title: "LonLat" })
 
-const MercatorSchema = FixedProjectionSchema.extend({
+const MercatorSchema = z.strictObject({
   name: z.literal("Mercator"),
 }).meta({ title: "Mercator" })
 
@@ -52,11 +52,10 @@ const VarSchema = z.strictObject({
   units: z.string(),
   long_name: z.string(),
   standard_name: z.string(),
-  description: z.string(),
 });
 
 export const DataVarSchema = VarSchema.extend({
-  name: z.string(),
+  arrName: z.string(),
   lon: z.string(),
   lat: z.string(),
   level: z.string(),
@@ -64,8 +63,8 @@ export const DataVarSchema = VarSchema.extend({
 }).meta({ title: "DataVar" });
 
 export const VectorVarSchema = VarSchema.extend({
-  uname: z.string(),
-  vname: z.string(),
+  uArrName: z.string(),
+  vArrName: z.string(),
 }).meta({ title: "VectorVar" });
 
 export const DatasetSchema = z.strictObject({
@@ -82,7 +81,10 @@ export const DatasetSchema = z.strictObject({
     StereographicSchema,
     EquirectangularSchema,
     ConicConformalSchema
-  ])
+  ]),
+  title: z.string().length(100),
+  subtitle: z.string().length(150),
+  description: z.string(),
 }).meta({ title: "Dataset" })
 
 export type DataVar = z.infer<typeof DataVarSchema>;

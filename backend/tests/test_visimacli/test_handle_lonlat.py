@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import xarray as xr
 from vizima.dataset_model import LatAxis, LonAxis
-from vizima.vizimacli import handle_lonlat
+from vizima.vizimacli import handle_lonlats
 
 # --- The Tests ---
 
@@ -24,7 +24,7 @@ def test_handle_lonlat_1d_longitude():
     # Using cf-xarray logic: we assume .cf(['longitude']) works
     # If you haven't imported cf_xarray in your module, ensure it's loaded.
 
-    result = handle_lonlat(ds, "longitude")
+    result = handle_lonlats(ds, "longitude")
 
     assert "lon" in result
     assert isinstance(result["lon"], LonAxis)
@@ -43,7 +43,7 @@ def test_handle_lonlat_2d_latitude():
         coords={"lat_2d": (["y", "x"], lat_vals, {"units": "degrees_north"})}
     )
 
-    result = handle_lonlat(ds, "latitude")
+    result = handle_lonlats(ds, "latitude")
 
     assert result["lat_2d"].start == -90.0
     assert result["lat_2d"].end == 90.0
@@ -60,7 +60,7 @@ def test_handle_lonlat_no_coordinates():
         coords={"lat_2d": (["y", "x"], lat_vals, {"units": "degrees_north"})}
     )
 
-    result = handle_lonlat(ds, "longitude")
+    result = handle_lonlats(ds, "longitude")
 
     assert result == {}
 
@@ -70,7 +70,7 @@ def test_handle_lonlat_invalid_coord_name():
     with pytest.raises(
         ValueError, match="coord_name must be 'longitude' or 'latitude'"
     ):
-        handle_lonlat(ds, "altitude")  # type: ignore
+        handle_lonlats(ds, "altitude")  # type: ignore
 
 
 def test_handle_lonlat_invalid_ndim():
@@ -81,4 +81,4 @@ def test_handle_lonlat_invalid_ndim():
     )
 
     with pytest.raises(ValueError, match="Dimension of longitude should be 1 or 2"):
-        handle_lonlat(ds, "longitude")
+        handle_lonlats(ds, "longitude")
