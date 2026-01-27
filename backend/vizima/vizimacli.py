@@ -451,7 +451,7 @@ def prepare_metadata(
         subtitle = ask_text("", "Subtitle for this dataset: ")
         description = ask_text("", "Description for this dataset: ")
     except KeyboardInterrupt:
-        print("Conversation interrupted by user")
+        logger.info("Conversation interrupted by user")
         exit(1)
 
     # This is just for validation
@@ -479,9 +479,10 @@ def prepare_metadata(
     with open(metadata_file, "w") as f:
         json.dump(metadata, f, indent=2)
 
-    print(f"Metadata saved to {metadata_file}")
+    logger.info(f"Metadata saved to {metadata_file}")
 
 
+@app.command()
 def process_dataset(
     dataset_file: t.Annotated[
         Path,
@@ -506,12 +507,52 @@ def process_dataset(
     ds = xr.open_dataset(dataset_file)
     metadata = json.load(open(metadata_file))
 
-    dataarrays = metadata["dataarrays"]
+    lons = handle_lons(ds)
+    lats = handle_lats(ds)
+    levels = handle_levels(ds)
+    times = handle_times(ds)
+
+    dataset = Dataset(
+        lons=lons,
+        lats=lats,
+        levels=levels,
+        times=times,
+        datavars=metadata["datavars"],
+        vectors=metadata["vectors"],
+        projection=metadata["projection"],
+        title=metadata["title"],
+        subtitle=metadata["subtitle"],
+        description=metadata["description"],
+    )
 
     out_ds = xr.Dataset()
+    out_ds.attrs = dataset.model_dump()
 
-    for _, dataarray in dataarrays.items():
-        out_ds[dataarray["name"]] = ds[dataarray["name"]]
+    encoding: dict[str, dict] = {}
+
+    for _, dataarray in metadata["datavars"].items():
+        var = ds[dataarray["name"]]
+        out_ds[dataarray["name"]] = var
+
+        # TODO: need to implement intelligent chunking strategy
+        chunks = []
+        if dataarray["time"]:
+            chunks.append(1)
+        if dataarray["level"]:
+            chunks.append(1)
+        chunks.append(var.shape[-2])
+        chunks.append(var.shape[-1])
+
+        encoding[dataarray["name"]] = {
+            "dtype": "int16",
+            "_FillValue": -32767,
+            "chunks": tuple(chunks),
+            **get_packing_params(var),
+        }
+
+    out_ds.to_zarr(out, mode="w", encoding=encoding)
+
+    logger.info(f"Dataset saved to {out}")
 
 
 if __name__ == "__main__":

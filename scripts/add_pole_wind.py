@@ -11,24 +11,21 @@ def calculate_polar_winds(u_row, v_row, lons_deg):
     u_row: array of u-wind at closest latitude (e.g., 89.75 or -89.75)
     v_row: array of v-wind at closest latitude
     lons_deg: array of longitudes (0 to 360)
-    lat: the latitude of the pole you are calculating (90 or -90)
     """
     lons_rad = np.radians(lons_deg)
 
-    # Determine hemisphere multiplier: 1 for North Pole, -1 for South Pole
-    hemi = 1.0
     # 1. Rotate all vectors to the Prime Meridian common coordinate system
     # For South Pole, the 'v' direction and rotation sense are inverted
-    u_prime = u_row * np.cos(lons_rad) - hemi * v_row * np.sin(lons_rad)
-    v_prime = u_row * np.sin(lons_rad) + hemi * v_row * np.cos(lons_rad)
+    u_prime = u_row * np.cos(lons_rad) - v_row * np.sin(lons_rad)
+    v_prime = u_row * np.sin(lons_rad) + v_row * np.cos(lons_rad)
 
     # 2. Average the rotated components to find the single physical vector
     u_pole_avg = np.mean(u_prime)
     v_pole_avg = np.mean(v_prime)
 
     # 3. Project back to every longitude (recreating the sine wave for GRIB/NetCDF)
-    u_at_pole = u_pole_avg * np.cos(lons_rad) + hemi * v_pole_avg * np.sin(lons_rad)
-    v_at_pole = -hemi * u_pole_avg * np.sin(lons_rad) + v_pole_avg * np.cos(lons_rad)
+    u_at_pole = u_pole_avg * np.cos(lons_rad) + v_pole_avg * np.sin(lons_rad)
+    v_at_pole = -u_pole_avg * np.sin(lons_rad) + v_pole_avg * np.cos(lons_rad)
 
     return u_at_pole, v_at_pole
 
