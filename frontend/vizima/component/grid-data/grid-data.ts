@@ -36,7 +36,7 @@ export class GridData {
     const val = this.array[j * this.nx + i];
     return val === undefined ? NaN : val
   }
-  protected bilinear(
+  private bilinear(
     v00: number,
     v10: number,
     v01: number,
@@ -50,7 +50,7 @@ export class GridData {
     return top + v * (bottom - top);
   }
 
-  protected bilinearInterpCtx(x: number, y: number, xwrap: boolean) {
+  private bilinearInterpCtx(x: number, y: number, xwrap: boolean) {
     const fCol = (x - this.xs);
     const fRow = (y - this.ys);
 
