@@ -1,43 +1,52 @@
-import { ImmutableComponent } from "../types";
-import { GridScalarData } from "../grid-data";
-import type { Globe } from "../globe";
+import type { LatAxis, LonAxis } from "../../datatype/dataset";
+import type { ProjConfig } from "../globe/proj";
+import { Agent, Provider } from "../../datatype/types";
+import { getPixelField } from "./interpolators";
 
-export interface PixelFieldProps {
-  readonly grid: GridScalarData;
-  readonly globe: Globe;
+export type Grid = {
+  readonly url: string,
+  readonly lonAxis: LonAxis,
+  readonly latAxis: LatAxis,
+  readonly timeIndex?: number,
+  readonly verticalIndex?: number,
+}
+
+export type PixelFieldConfig = {
+  readonly grid: Grid;
+  readonly proj: ProjConfig;
   readonly width: number;
   readonly height: number;
 }
 
-export class PixelField extends ImmutableComponent<
-  PixelFieldProps,
-  Float32Array
-> {
+export class PixelField {
+  constructor(
+    private readonly width: number,
+    private readonly height: number,
+    private readonly value: Float32Array
+  ) { }
+
   isDefined(x: number, y: number): boolean {
-    return !Number.isNaN(this.value[x + y * this.props.width]);
+    return !Number.isNaN(this.get(x, y));
   }
+
   get(x: number, y: number): number {
-    const val = this.value[x + y * this.props.width];
+    if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
+      return NaN;
+    }
+    const val = this.value[x + y * this.width];
     return !val ? NaN : val;
   }
+
 }
 
-interface Vector{
-  u: Float32Array;
-  v: Float32Array;
-}
 
-export class PixelFieldVector extends ImmutableComponent<
-  PixelFieldProps,
-  Vector
-> {
-  get(x: number, y: number): { u: number; v: number } {
-    const u = this.value.u[x + y * this.props.width]
-    const v = this.value.v[x + y * this.props.width]
-    return !u || !v ? { u: NaN, v: NaN } : { u, v };
-  }
-  isValid(x: number, y: number): boolean {
-    const { u, v } = this.get(x, y);
-    return !u || !v || !isNaN(u) || !isNaN(v)
-  }
-}
+const CACHE_SIZE = 50;
+export class PixelFieldAgent extends Agent<PixelFieldConfig, PixelField> { }
+export class PixelFieldProvider extends Provider<PixelFieldConfig, PixelField> { }
+
+export const pixelFieldAgent = new PixelFieldAgent(
+  new PixelFieldProvider(getPixelField, CACHE_SIZE),
+);
+
+export const createPixelFieldAgent = () =>
+  new PixelFieldAgent(new PixelFieldProvider(getPixelField, CACHE_SIZE));

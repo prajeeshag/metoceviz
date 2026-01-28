@@ -1,32 +1,41 @@
-import { ImmutableComponent, type ValidComponentProps } from "../types";
-import { alignLongitude } from "./utils";
 
-export interface GridProps {
-  readonly xsGlobal: number;
-  readonly ysGlobal: number;
-  readonly xs: number; // x coordinate start
-  readonly ys: number; // y coordinate start
-  readonly dx: number; // x coordinate step
-  readonly dy: number; // y coordinate step
-  readonly nx: number; // number of x coordinates
-  readonly ny: number; // number of y coordinates
-  readonly tIndex?: number;
-  readonly lIndex?: number;
-  readonly islatlon?: boolean;
+export type GridConfig = {
+  url: string;
+  readonly xs: number;
+  readonly ys: number;
+  readonly nx: number;
+  readonly ny: number;
+  readonly timeIndex?: number;
+  readonly vertIndex?: number;
 }
 
 
-export type ValidGridProps<T> = ValidComponentProps<T> & GridProps;
+export class GridData {
+  constructor(
+    private readonly xs: number,
+    private readonly ys: number,
+    private readonly nx: number,
+    private readonly ny: number,
+    private readonly array: Float32Array
+  ) { }
 
-export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>> extends ImmutableComponent<
-  Props,
-  Field
-> {
+  private get xe(): number {
+    return this.xs + this.nx - 1
+  }
 
-  abstract get(i: number, j: number): Value;
-  abstract interpolateBilinear(x: number, y: number): Value;
-  abstract interpolateNearest(x: number, y: number): Value;
+  private get ye(): number {
+    return this.ys + this.ny - 1
+  }
 
+  get(x: number, y: number): number {
+    const i = Math.floor(x) - this.xs
+    const j = Math.floor(y) - this.ys
+    if (i < 0 || i >= this.nx || j < 0 || j >= this.ny) {
+      return NaN;
+    }
+    const val = this.array[j * this.nx + i];
+    return val === undefined ? NaN : val
+  }
   protected bilinear(
     v00: number,
     v10: number,
@@ -41,21 +50,9 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
     return top + v * (bottom - top);
   }
 
-  private get xwrap(): boolean {
-    if (!this.props.islatlon) {
-      return false;
-    }
-    const props = this.props as GridProps;
-    const lon_wrap = props.xs + props.dx * props.nx;
-    return Math.abs(lon_wrap - props.xs - 360) < 1e-7;
-  }
-
-  protected bilinearInterpCtx(x: number, y: number) {
-    x = this.alignLongitude(x);
-    const props = this.props as GridProps;
-    const { xs, dx, nx, ys, dy, ny } = props;
-    const fCol = (x - xs) / dx;
-    const fRow = (y - ys) / dy;
+  protected bilinearInterpCtx(x: number, y: number, xwrap: boolean) {
+    const fCol = (x - this.xs);
+    const fRow = (y - this.ys);
 
     let i0 = Math.floor(fCol);
     let j0 = Math.floor(fRow);
@@ -63,52 +60,53 @@ export abstract class GridData<Field, Value, Props extends ValidGridProps<Props>
     let j1 = j0 + 1;
 
     const v = fRow - j0;
-
     const u = fCol - i0;
 
-    if (this.xwrap) {
+    if (xwrap) {
       if (i0 < 0) {
-        i0 = nx + i0;
+        i0 = this.nx + i0;
       }
-      if (i0 >= nx) {
-        i0 = i0 - nx;
+      if (i0 >= this.nx) {
+        i0 = i0 - this.nx;
       }
-      if (i1 >= nx) {
-        i1 = i1 - nx;
+      if (i1 >= this.nx) {
+        i1 = i1 - this.nx;
       }
     }
     return { i0, j0, i1, j1, u, v };
   }
 
-
-  protected nearestInterpCtx(x: number, y: number) {
-    x = this.alignLongitude(x);
-    const props = this.props as GridProps;
-    const { xs, dx, nx, ys, dy, ny } = props;
-    const fCol = (x - xs) / dx;
-    const fRow = (y - ys) / dy;
-
+  protected nearestInterpCtx(x: number, y: number, xwrap: boolean) {
+    const fCol = (x - this.xs)
+    const fRow = (y - this.ys)
     let i0 = Math.round(fCol);
     let j0 = Math.round(fRow);
 
-    if (this.xwrap) {
+    if (xwrap) {
       if (i0 < 0) {
-        i0 = nx - 1;
+        i0 = this.nx - 1;
       }
-      if (i0 >= nx) {
+      if (i0 >= this.nx) {
         i0 = 0;
       }
     }
-
     return { i0, j0 };
   }
 
+  interpolateBilinear(x: number, y: number, xwrap: boolean): number {
+    const ctx = this.bilinearInterpCtx(x, y, xwrap);
+    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i1 >= this.nx || ctx.j1 >= this.ny) return NaN;
 
-  protected alignLongitude(lon: number): number {
-    const props = this.props as GridProps;
-    if (!props.islatlon) {
-      return lon;
-    }
-    return alignLongitude(props.xs, lon);
+    const v00 = this.get(ctx.i0, ctx.j0);
+    const v10 = this.get(ctx.i1, ctx.j0);
+    const v01 = this.get(ctx.i0, ctx.j1);
+    const v11 = this.get(ctx.i1, ctx.j1);
+    return this.bilinear(v00, v10, v01, v11, ctx.u, ctx.v);
+  }
+
+  interpolateNearest(x: number, y: number, xwrap: boolean): number {
+    const ctx = this.nearestInterpCtx(x, y, xwrap);
+    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i0 >= this.nx || ctx.j0 >= this.ny) return NaN;
+    return this.get(ctx.i0, ctx.j0);
   }
 }

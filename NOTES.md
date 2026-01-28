@@ -52,10 +52,9 @@
   ```
     const projection = d3.geoConicConformal()
         .parallels([TRUELAT1, TRUELAT2])
-        .center([0, MOAD_CEN_LAT])
         .rotate([-STAND_LON, 0])
         .scale(10000);
-    const stand_lon_point = projection([STAND_LON, MOAD_CEN_LAT]);
+    const stand_lon_point = projection([STAND_LON, 0]);
     const cen_lon_point = projection([CEN_LON, MOAD_CEN_LAT]);
     projection.translate([canvas.width / 2 + (stand_lon_point[0] - cen_lon_point[0]), canvas.height / 2 + (stand_lon_point[1] - cen_lon_point[1])]);
 

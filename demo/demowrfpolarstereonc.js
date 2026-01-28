@@ -57,8 +57,8 @@ async function render() {
     const attrs = await get_attrs("polar_noncentered");
 
     // 2. Setup Canvas
-    const width = 1000;
-    const height = 1000;
+    const width = 600;
+    const height = 800;
 
     const canvas = document.getElementById('mapCanvas');
     canvas.width = width;
@@ -74,10 +74,23 @@ async function render() {
     // Added .fitSize to automatically center and scale your data to the canvas
     const projection = d3.geoStereographic()
         .rotate([-attrs.STAND_LON, -attrs.MOAD_CEN_LAT])
-        .scale(30000)
-    const stand_lon_point = projection([attrs.STAND_LON, attrs.MOAD_CEN_LAT]);
-    const cen_lon_point = projection([attrs.CEN_LON, attrs.MOAD_CEN_LAT]);
-    projection.translate([canvas.width / 2 + (stand_lon_point[0] - cen_lon_point[0]), canvas.height / 2 + (stand_lon_point[1] - cen_lon_point[1])]);
+    // .rotate([-attrs.STAND_LON, -attrs.TRUELAT1])
+
+    const points = d3.zip(attrs.corner_lons, attrs.corner_lats).slice(0, 4);
+    points.push(points[0])
+    projection.fitHeight(canvas.height, { type: "Polygon", coordinates: [points] });
+    const [x, y] = projection(points[2]);
+    const translate = projection.translate();
+    projection.translate([translate[0] - (x - canvas.width) / 2, translate[1]]);
+    projection.fitSize([canvas.width, canvas.height], { type: "Polygon", coordinates: [points] });
+
+    console.log(projection.rotate());
+    console.log(projection.translate());
+    console.log(projection.scale());
+
+    // const stand_lon_point = projection([attrs.STAND_LON, attrs.MOAD_CEN_LAT]);
+    // const cen_lon_point = projection([attrs.CEN_LON, attrs.MOAD_CEN_LAT]);
+    // projection.translate([canvas.width / 2 + (stand_lon_point[0] - cen_lon_point[0]), canvas.height / 2 + (stand_lon_point[1] - cen_lon_point[1])]);
 
     // 4. Draw Points
     ctx.fillStyle = "blue";

@@ -1,4 +1,4 @@
-import { Agent, Provider } from "../types";
+import { Agent, Provider } from "../../datatype/types";
 import { GridScalar, type GridScalarProps } from "./grid-scalar";
 import { GridVector, type GridVectorProps } from "./grid-vector";
 import { fetchZarrGridScalar } from "./fetchers";

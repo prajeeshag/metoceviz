@@ -1,6 +1,6 @@
-import { ImmutableComponent, type ValidComponentProps } from "../types";
+import { ImmutableComponent, type ValidComponentProps } from "../../datatype/types";
 
-export interface PainterProps {}
+export interface PainterProps { }
 
 export type ValidPainterProps<T> = PainterProps & ValidComponentProps<T>;
 

@@ -1,4 +1,4 @@
-import { ImmutableComponent, Agent, Provider } from "./types";
+import { ImmutableComponent, Agent, Provider } from "../datatype/types";
 
 export interface JsonDataProp {
   readonly url: string;
@@ -6,11 +6,11 @@ export interface JsonDataProp {
 
 const DEFAULT_CACHE_SIZE = 10;
 
-export class JsonData extends ImmutableComponent<JsonDataProp, any> {}
+export class JsonData extends ImmutableComponent<JsonDataProp, any> { }
 
-class JsonDataProvider extends Provider<JsonDataProp, JsonData> {}
+class JsonDataProvider extends Provider<JsonDataProp, JsonData> { }
 
-class JsonDataAgent extends Agent<JsonDataProp, JsonData> {}
+class JsonDataAgent extends Agent<JsonDataProp, JsonData> { }
 
 async function jsonDataFetch(
   props: JsonDataProp,

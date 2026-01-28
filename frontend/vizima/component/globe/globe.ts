@@ -1,12 +1,17 @@
 import * as d3 from "d3";
-import { ImmutableComponent } from "../types";
 import { zoom as d3zoom, type ZoomBehavior, type DragBehavior } from "d3";
 import { type ProjectionType, PROJECTIONS } from "./projections";
+import { type StrictData } from "../../datatype/types";
 
-interface GlobeConfig {
+
+export type GlobeConfig = {
   proj: ProjectionType;
-  viewSize: [number, number];
-}
+  rot?: [number, number, number];
+  trans?: [number, number];
+  scale?: number;
+  parallels?: [number, number];
+};
+
 
 export class Globe extends ImmutableComponent<GlobeConfig, null> {
   private _projection: d3.GeoProjection;

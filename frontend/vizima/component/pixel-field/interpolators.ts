@@ -1,12 +1,14 @@
-import { PixelField, type PixelFieldProps } from "./pixel-data";
+import { PixelField, type PixelFieldConfig } from "./pixel-data";
+import { getProjection } from "../globe/proj";
 
 export async function getPixelField(
-  props: PixelFieldProps,
+  props: PixelFieldConfig,
   signal: AbortSignal,
 ): Promise<PixelField> {
 
-  const { width, height, globe, grid } = props;
-
+  const width = props.width;
+  const height = props.height;
+  const proj = getProjection(props.proj);
   const mask = createMask(props);
 
   const gridValue = grid.value;
@@ -32,7 +34,7 @@ export async function getPixelField(
   return new PixelField(props, pixelFieldArray);
 }
 
-function createMask(props: PixelFieldProps) {
+function createMask(props: PixelFieldConfig) {
   const canvas = document.createElement("canvas");
   canvas.width = props.width;
   canvas.height = props.height;
@@ -55,3 +57,10 @@ function createMask(props: PixelFieldProps) {
 
   return mask;
 }
+
+
+
+
+
+
+

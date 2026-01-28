@@ -26,7 +26,7 @@ async function render() {
 
 
     // 2. Setup Canvas
-    const width = 800;
+    const width = 600;
     const height = 800;
 
     const canvas = document.getElementById('mapCanvas');
@@ -39,14 +39,22 @@ async function render() {
 
     // 3. Setup Projection
 
+    const points = d3.zip(attrs.corner_lons, attrs.corner_lats).slice(0, 4);
+    points.push(points[0])
+
     const projection = d3.geoConicConformal()
         .parallels([attrs.TRUELAT1, attrs.TRUELAT2])
-        .center([0, attrs.MOAD_CEN_LAT])
         .rotate([-attrs.STAND_LON, 0])
-        .scale(10000);
-    const stand_lon_point = projection([attrs.STAND_LON, attrs.MOAD_CEN_LAT]);
-    const cen_lon_point = projection([attrs.CEN_LON, attrs.MOAD_CEN_LAT]);
-    projection.translate([canvas.width / 2 + (stand_lon_point[0] - cen_lon_point[0]), canvas.height / 2 + (stand_lon_point[1] - cen_lon_point[1])]);
+    projection.fitHeight(canvas.height, { type: "Polygon", coordinates: [points] });
+    const [x, y] = projection(points[2]);
+    const translate = projection.translate();
+    projection.translate([translate[0] - (x - canvas.width) / 2, translate[1]]);
+
+    console.log(projection.rotate());
+    console.log(projection.translate());
+    console.log(projection.scale());
+
+
 
 
     const fmt = d3.format("03.0f");
@@ -54,18 +62,23 @@ async function render() {
     // 4. Draw Points
     ctx.fillStyle = "white";
     ctx.beginPath();
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 2;
+    const path = d3.geoPath(projection, ctx);
+    path({ type: "Polygon", coordinates: [points] });
+    ctx.stroke();
 
-    for (let i = 0; i < xlat.length; i++) {
-        const coords = projection([xlong[i], xlat[i]]);
+    // for (let i = 0; i < xlat.length; i++) {
+    //     const coords = projection([xlong[i], xlat[i]]);
 
-        if (coords) {
-            const [x, y] = coords;
-            // Draw a small 1x1 pixel rect for each point
-            // ctx.fillRect(x, y, 1, 1);
-            ctx.fillText(fmt(i), x, y);
-            console.log(fmt(i), fmt2(x), fmt2(y));
-        }
-    }
+    //     if (coords) {
+    //         const [x, y] = coords;
+    //         // Draw a small 1x1 pixel rect for each point
+    //         // ctx.fillRect(x, y, 1, 1);
+    //         ctx.fillText(fmt(i), x, y);
+    //         console.log(fmt(i), fmt2(x), fmt2(y));
+    //     }
+    // }
 
     console.log("Plotting complete.");
     console.log(attrs);
