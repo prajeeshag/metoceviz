@@ -1,4 +1,3 @@
-
 export type GridConfig = {
   url: string;
   readonly xs: number;
@@ -7,34 +6,32 @@ export type GridConfig = {
   readonly ny: number;
   readonly timeIndex?: number;
   readonly vertIndex?: number;
-}
-
+};
 
 export class GridData {
+  private readonly xs: number;
+  private readonly ys: number;
+  private readonly nx: number;
+  private readonly ny: number;
+
   constructor(
-    private readonly xs: number,
-    private readonly ys: number,
-    private readonly nx: number,
-    private readonly ny: number,
-    private readonly array: Float32Array
-  ) { }
-
-  private get xe(): number {
-    return this.xs + this.nx - 1
-  }
-
-  private get ye(): number {
-    return this.ys + this.ny - 1
+    config: { xs: number; ys: number; nx: number; ny: number },
+    private readonly array: Float32Array,
+  ) {
+    this.xs = config.xs;
+    this.ys = config.ys;
+    this.nx = config.nx;
+    this.ny = config.ny;
   }
 
   get(x: number, y: number): number {
-    const i = Math.floor(x) - this.xs
-    const j = Math.floor(y) - this.ys
+    const i = Math.floor(x) - this.xs;
+    const j = Math.floor(y) - this.ys;
     if (i < 0 || i >= this.nx || j < 0 || j >= this.ny) {
       return NaN;
     }
     const val = this.array[j * this.nx + i];
-    return val === undefined ? NaN : val
+    return val === undefined ? NaN : val;
   }
   private bilinear(
     v00: number,
@@ -51,8 +48,8 @@ export class GridData {
   }
 
   private bilinearInterpCtx(x: number, y: number, xwrap: boolean) {
-    const fCol = (x - this.xs);
-    const fRow = (y - this.ys);
+    const fCol = x - this.xs;
+    const fRow = y - this.ys;
 
     let i0 = Math.floor(fCol);
     let j0 = Math.floor(fRow);
@@ -77,8 +74,8 @@ export class GridData {
   }
 
   protected nearestInterpCtx(x: number, y: number, xwrap: boolean) {
-    const fCol = (x - this.xs)
-    const fRow = (y - this.ys)
+    const fCol = x - this.xs;
+    const fRow = y - this.ys;
     let i0 = Math.round(fCol);
     let j0 = Math.round(fRow);
 
@@ -95,7 +92,8 @@ export class GridData {
 
   interpolateBilinear(x: number, y: number, xwrap: boolean): number {
     const ctx = this.bilinearInterpCtx(x, y, xwrap);
-    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i1 >= this.nx || ctx.j1 >= this.ny) return NaN;
+    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i1 >= this.nx || ctx.j1 >= this.ny)
+      return NaN;
 
     const v00 = this.get(ctx.i0, ctx.j0);
     const v10 = this.get(ctx.i1, ctx.j0);
@@ -106,7 +104,8 @@ export class GridData {
 
   interpolateNearest(x: number, y: number, xwrap: boolean): number {
     const ctx = this.nearestInterpCtx(x, y, xwrap);
-    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i0 >= this.nx || ctx.j0 >= this.ny) return NaN;
+    if (ctx.i0 < 0 || ctx.j0 < 0 || ctx.i0 >= this.nx || ctx.j0 >= this.ny)
+      return NaN;
     return this.get(ctx.i0, ctx.j0);
   }
 }

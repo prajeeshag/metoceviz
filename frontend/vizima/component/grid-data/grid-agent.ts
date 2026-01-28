@@ -1,26 +1,13 @@
 import { Agent, Provider } from "../../datatype/types";
-import { GridScalar, type GridScalarProps } from "./grid-scalar";
-import { GridVector, type GridVectorProps } from "./grid-vector";
-import { fetchZarrGridScalar } from "./fetchers";
-import { fetchZarrGridVector } from "./fetchers";
+import { fetchZarrGrid } from "./fetch-zarr-grid";
+import { type GridConfig, GridData } from "./grid-data";
 
 const CACHE_SIZE = 50;
-export class GridScalarAgent extends Agent<GridScalarProps, GridScalar> { }
-export class GridScalarProvider extends Provider<GridScalarProps, GridScalar> { }
+export class GridAgent extends Agent<GridConfig, GridData> {}
+export class GridScalarProvider extends Provider<GridConfig, GridData> {}
 
-const gridScalarProvider = new GridScalarProvider(fetchZarrGridScalar, CACHE_SIZE);
-export const createGridScalarAgent = () => {
-  return new GridScalarAgent(
-    gridScalarProvider,
-  )
-};
+const gridScalarProvider = new GridScalarProvider(fetchZarrGrid, CACHE_SIZE);
 
-export class GridVectorAgent extends Agent<GridVectorProps, GridVector> { }
-export class GridVectorProvider extends Provider<GridVectorProps, GridVector> { }
-
-const gridVectorProvider = new GridVectorProvider(fetchZarrGridVector, CACHE_SIZE);
-export const createGridVectorAgent = () => {
-  return new GridVectorAgent(
-    gridVectorProvider,
-  )
+export const createGridAgent = () => {
+  return new GridAgent(gridScalarProvider);
 };
