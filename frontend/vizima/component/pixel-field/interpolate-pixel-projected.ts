@@ -25,7 +25,7 @@ export async function getPixelProj(
       const value = gridValue.interpolateBilinear(
         point![0],
         point![1],
-        is_preriodic(props.lonStart, props.nlon, props.dlon),
+        is_preriodic_lon(props.lonStart, props.nlon, props.dlon),
       );
       pixelFieldArray[y * width + x] = value;
     }
@@ -60,9 +60,4 @@ function createMask(props: PixelProjectedConfig, proj: Proj) {
   }
 
   return mask;
-}
-
-function is_preriodic(lonStart: number, nlon: number, dlon: number) {
-  const lonEnd = lonStart + nlon * dlon;
-  return lonStart === lonEnd - 360;
 }
