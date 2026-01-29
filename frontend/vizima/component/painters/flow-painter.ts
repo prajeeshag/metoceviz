@@ -1,10 +1,10 @@
 import { Painter, type PainterProps } from "./painter";
-import type { PixelField } from "../pixel-field";
+import type { PixelProjected } from "../pixel-field";
 import { logger } from "../../logger";
 import * as d3 from "d3";
 
 interface PColorLayerProps extends PainterProps {
-  readonly field: PixelField;
+  readonly field: PixelProjected;
 }
 
 class PColorPainter extends Painter<PColorLayerProps> {
@@ -57,26 +57,31 @@ export default function createPColorPainter(props: PColorLayerProps) {
 }
 
 class WindIntensityColorScale {
-    private result: string[];
-    private maxWind: number;
-    
-    constructor(step: number, maxWind: number) {
-        this.result = [];
-        this.maxWind = maxWind;
-        for (var j = 85; j <= 255; j += step) {
-            this.result.push(this.asColorStyle(j, j, j, 1.0));
-        }
+  private result: string[];
+  private maxWind: number;
+
+  constructor(step: number, maxWind: number) {
+    this.result = [];
+    this.maxWind = maxWind;
+    for (var j = 85; j <= 255; j += step) {
+      this.result.push(this.asColorStyle(j, j, j, 1.0));
     }
-    
-    private asColorStyle(r: number, g: number, b: number, a: number) {
-        return `rgba(${r}, ${g}, ${b}, ${a})`;
-    }
-    
-    indexFor(m: number) {  // map wind speed to a style
-        return Math.floor(Math.min(m, this.maxWind) / this.maxWind * (this.result.length - 1));
-    }
+  }
+
+  private asColorStyle(r: number, g: number, b: number, a: number) {
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  indexFor(m: number) {
+    // map wind speed to a style
+    return Math.floor(
+      (Math.min(m, this.maxWind) / this.maxWind) * (this.result.length - 1),
+    );
+  }
 }
 
 function isMobile() {
-    return (/android|blackberry|iemobile|ipad|iphone|ipod|opera mini|webos/i).test(navigator.userAgent);
+  return /android|blackberry|iemobile|ipad|iphone|ipod|opera mini|webos/i.test(
+    navigator.userAgent,
+  );
 }

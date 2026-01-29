@@ -3,29 +3,38 @@ import stringify from "json-stable-stringify";
 
 type Primitive = string | number | boolean | bigint | symbol | undefined | null;
 
-export type StrictData =
+export type ConfigType =
   | Primitive
-  | readonly Primitive[] // Fixed-length arrays/tuples or readonly arrays
-  | { readonly [key: string]: StrictData }; // Recursive objects
+  | readonly Primitive[]
+  | { readonly [key: string]: ConfigType }
+  | Data<any, any>;
 
+export class Data<Config extends ConfigType, Value> {
+  constructor(
+    readonly props: Config,
+    readonly value: Value,
+  ) {}
 
+  toJSON() {
+    return this.props;
+  }
+}
 
-
-export class Agent<Prop extends StrictData, Value> {
-  constructor(readonly provider: Provider<Prop, Value>) { }
+export class Agent<Prop extends ConfigType, Value> {
+  constructor(readonly provider: Provider<Prop, Value>) {}
 
   get(props: Prop, args?: any): Promise<Value> {
     return this.provider.get(props, this, args);
   }
 }
 
-type ComputeFn<Prop extends StrictData, Value> = (
+type ComputeFn<Prop extends ConfigType, Value> = (
   props: Prop,
   signal: AbortSignal,
   args?: any,
 ) => Promise<Value>;
 
-export class Provider<Prop extends StrictData, Value> {
+export class Provider<Prop extends ConfigType, Value> {
   private cache = new Map<string, Value>();
   private pending = new Map<string, Promise<Value>>();
   private controllers = new WeakMap<Agent<Prop, Value>, AbortController>();
@@ -34,9 +43,13 @@ export class Provider<Prop extends StrictData, Value> {
   constructor(
     private compute: ComputeFn<Prop, Value>,
     private maxCacheSize: number = 1,
-  ) { }
+  ) {}
 
-  async get(props: Prop, agent: Agent<Prop, Value>, args?: any): Promise<Value> {
+  async get(
+    props: Prop,
+    agent: Agent<Prop, Value>,
+    args?: any,
+  ): Promise<Value> {
     const stableKey = stringify(props);
 
     if (stableKey && this.cache.has(stableKey)) {

@@ -1,8 +1,7 @@
 import * as d3 from "d3";
 import { zoom as d3zoom, type ZoomBehavior, type DragBehavior } from "d3";
 import { type ProjectionType, PROJECTIONS } from "./projections";
-import { type StrictData } from "../../datatype/types";
-
+import { type ConfigType } from "../../datatype/types";
 
 export type GlobeConfig = {
   proj: ProjectionType;
@@ -11,7 +10,6 @@ export type GlobeConfig = {
   scale?: number;
   parallels?: [number, number];
 };
-
 
 export class Globe extends ImmutableComponent<GlobeConfig, null> {
   private _projection: d3.GeoProjection;
@@ -102,7 +100,6 @@ export class Globe extends ImmutableComponent<GlobeConfig, null> {
   setRotation(rotation: [number, number, number]) {
     this._projection.rotate(rotation);
   }
-
 
   getScale(): number {
     return this._projection.scale();
